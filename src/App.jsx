@@ -41,6 +41,7 @@ import AdminSmsSettings from '@/pages/AdminSmsSettings';
 import AdminLayout from '@/components/AdminLayout';
 import AdminErrorBoundary from '@/components/AdminErrorBoundary';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 import { CartProvider } from '@/context/CartContext';
 import { LanguageProvider } from '@/context/LanguageContext';
@@ -63,6 +64,7 @@ const LayoutWrapper = ({ children }) => {
 
 function App() {
   return (
+    <ErrorBoundary>
     <LanguageProvider>
       <SimplePasswordAuthProvider>
         <CartProvider>
@@ -73,6 +75,7 @@ function App() {
               </Helmet>
               
               <LayoutWrapper>
+                <ErrorBoundary>
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Home />} />
@@ -132,6 +135,7 @@ function App() {
                     <Route path="notifications" element={<AdminNotificationHistory />} />
                   </Route>
                 </Routes>
+                </ErrorBoundary>
               </LayoutWrapper>
               
             </div>
@@ -139,6 +143,7 @@ function App() {
         </CartProvider>
       </SimplePasswordAuthProvider>
     </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 
