@@ -29,6 +29,8 @@ const ProductDetail = () => {
       setLoading(true);
       try {
         console.log("[ProductDetail] Product ID from URL:", id);
+        console.log("[ProductDetail] Supabase URL:", import.meta.env.VITE_SUPABASE_URL || 'Using fallback');
+        
         // Fetch Product
         const { data: productData, error } = await supabase
           .from('products')
@@ -38,7 +40,13 @@ const ProductDetail = () => {
           
         if (error) {
             console.error("[ProductDetail] Supabase Error:", error);
+            console.error("[ProductDetail] Error details:", JSON.stringify(error));
             throw error;
+        }
+        
+        if (!productData) {
+          console.error("[ProductDetail] No product data returned");
+          throw new Error('Product not found');
         }
         
         setProduct(productData);
