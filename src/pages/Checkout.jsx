@@ -8,6 +8,7 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { sendOrderNotificationsViaEdgeFunction } from '@/services/orderNotificationService';
+import { trackBeginCheckout } from '@/utils/analytics';
 
 const Checkout = () => {
   const { cartItems, getCartTotal, clearCart } = useCart();
@@ -27,6 +28,12 @@ const Checkout = () => {
   const [orderComplete, setOrderComplete] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
+
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      trackBeginCheckout(cartItems, total);
+    }
+  }, []);
 
   useEffect(() => {
     // Check if we are in test mode to show banner
@@ -191,6 +198,7 @@ const Checkout = () => {
     <div className="container mx-auto px-4 py-12 max-w-7xl">
       <Helmet>
         <title>შეკვეთის გაფორმება - Handicraft</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-8 text-center text-[#57c5cf]">შეკვეთის გაფორმება</h1>

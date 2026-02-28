@@ -19,6 +19,7 @@ const Cart = () => {
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center">
         <Helmet>
           <title>კალათა - Handicraft</title>
+          <meta name="robots" content="noindex, nofollow" />
         </Helmet>
         <div className="w-32 h-32 bg-gray-50 rounded-full flex items-center justify-center mb-6 relative">
            <ShoppingBag className="w-16 h-16 text-gray-300" />
@@ -47,6 +48,7 @@ const Cart = () => {
     <div className="container mx-auto px-4 py-12 max-w-7xl">
       <Helmet>
         <title>კალათა - Handicraft</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       
       <h1 className="text-4xl font-heading font-bold mb-8 text-[#57c5cf]">კალათა</h1>

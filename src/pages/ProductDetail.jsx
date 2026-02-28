@@ -9,6 +9,7 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import AttributeDisplay from '@/components/AttributeDisplay';
+import { trackViewItem, trackAddToCart } from '@/utils/analytics';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -111,9 +112,15 @@ const ProductDetail = () => {
 
   const isOutOfStock = product.manage_inventory && product.stock_quantity === 0;
 
+  // Track product view
+  useEffect(() => {
+    if (product) trackViewItem(product);
+  }, [product?.id]);
+
   const handleAddToCart = () => {
     if(!isOutOfStock) {
       addToCart(product, quantity);
+      trackAddToCart(product, quantity);
       toast({ 
         title: "კალათაში დაემატა!",
         description: `${quantity} x ${displayName}`,
@@ -122,10 +129,44 @@ const ProductDetail = () => {
     }
   };
 
+  const productUrl = `https://handicraft.com.ge/product/${id}`;
+  const productImage = allImages[0] || product?.image_url || '';
+
   return (
     <div className="min-h-screen bg-white pb-20 pt-8">
       <Helmet>
         <title>{displayName} - Handicraft</title>
+        <meta name="description" content={displayDesc?.substring(0, 160) || `${displayName} — პრემიუმ ხარისხის ხელნაკეთი ნივთი Handicraft-ისგან.`} />
+        <link rel="canonical" href={productUrl} />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={`${displayName} - Handicraft`} />
+        <meta property="og:description" content={displayDesc?.substring(0, 160) || ''} />
+        <meta property="og:image" content={productImage} />
+        <meta property="og:url" content={productUrl} />
+        <meta property="og:locale" content="ka_GE" />
+        <meta property="product:price:amount" content={product?.price} />
+        <meta property="product:price:currency" content="GEL" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": displayName,
+            "description": displayDesc || '',
+            "image": productImage,
+            "url": productUrl,
+            "sku": id,
+            "brand": { "@type": "Brand", "name": "Handicraft" },
+            "offers": {
+              "@type": "Offer",
+              "price": product?.price,
+              "priceCurrency": "GEL",
+              "availability": product?.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+              "url": productUrl,
+              "seller": { "@type": "Organization", "name": "Handicraft" }
+            },
+            "category": categoryName || ''
+          })}
+        </script>
       </Helmet>
 
       <div className="container mx-auto px-4 max-w-7xl">
@@ -146,6 +187,8 @@ const ProductDetail = () => {
                  <img 
                    src={allImages[selectedImage]} 
                    alt={displayName} 
+                   width="600"
+                   height="600"
                    className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-105"
                  />
                  {isOutOfStock && (
@@ -174,7 +217,7 @@ const ProductDetail = () => {
                           : 'border-transparent hover:border-gray-300 opacity-70 hover:opacity-100'
                       }`}
                     >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} alt="" loading="lazy" width="120" height="120" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -192,11 +235,12 @@ const ProductDetail = () => {
                         ₾{product.price}
                      </div>
                      <div className="w-px h-8 bg-gray-200"></div>
-                     <div className="flex items-center gap-1">
-                        <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                        <span className="font-bold text-gray-900 ml-1 text-lg">{product.rating || 5}.0</span>
-                        <span className="text-gray-400 text-sm ml-1">(24 შეფასება)</span>
-                     </div>
+                     {product.rating && (
+                       <div className="flex items-center gap-1">
+                          <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                          <span className="font-bold text-gray-900 ml-1 text-lg">{Number(product.rating).toFixed(1)}</span>
+                       </div>
+                     )}
                   </div>
 
                   <p className="text-gray-600 leading-relaxed font-body text-lg">

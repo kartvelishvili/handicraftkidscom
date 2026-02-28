@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/customSupabaseClient';
 import Hero from '@/components/Hero';
 import FeaturedCategories from '@/components/FeaturedCategories';
@@ -29,6 +30,11 @@ const Home = () => {
 
   return (
     <>
+      <Helmet>
+        <title>Handicraft — პრემიუმ ხელნაკეთი ნივთები და სათამაშოები</title>
+        <meta name="description" content="Handicraft — უნიკალური, პრემიუმ ხარისხის ხელნაკეთი სათამაშოები და ბავშვის ნივთები. საძილე ტომარები, განმავითარებელი ხალიჩები, საწოლის ბამპერები. უფასო მიწოდება ₾150-ზე მეტ შეკვეთაზე." />
+        <link rel="canonical" href="https://handicraft.com.ge/" />
+      </Helmet>
       {sections.filter(s => s.is_active).map(section => (
         <React.Fragment key={section.id}>
            {components[section.component_key]}

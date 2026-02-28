@@ -1,0 +1,15 @@
+# Handicraft.com.ge - Robots.txt
+User-agent: *
+Allow: /
+
+# Disallow admin and private pages
+Disallow: /admin
+Disallow: /admin-login
+Disallow: /paneli
+Disallow: /checkout
+Disallow: /cart
+Disallow: /payment/
+Disallow: /profile
+
+# Sitemap
+Sitemap: https://handicraft.com.ge/sitemap.xml

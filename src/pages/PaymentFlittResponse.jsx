@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/customSupabaseClient';
 import { sendOrderNotificationsViaEdgeFunction } from '@/services/orderNotificationService';
+import { trackPurchase } from '@/utils/analytics';
 
 const PaymentFlittResponse = () => {
   const [searchParams] = useSearchParams();
@@ -52,6 +53,11 @@ const PaymentFlittResponse = () => {
           setStatus('success');
           setMessage('გადახდა წარმატებით შესრულდა!');
           
+          // Track purchase event
+          if (order.products && order.total_amount) {
+            trackPurchase(orderId, order.products, order.total_amount);
+          }
+
           // Clear cart
           localStorage.removeItem('cartItems');
 

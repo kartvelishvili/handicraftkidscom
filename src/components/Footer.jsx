@@ -9,6 +9,8 @@ const Footer = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const [settings, setSettings] = useState(null);
+  const [email, setEmail] = useState('');
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -19,8 +21,28 @@ const Footer = () => {
     fetchSettings();
   }, []);
 
-  const handleClick = () => {
-    toast({ title: "Working on it!" });
+  const handleNewsletterSubscribe = async () => {
+    if (!email || !email.includes('@')) {
+      toast({ title: 'გთხოვთ ჩაწერეთ სწორი ელ-ფოსტა', variant: 'destructive' });
+      return;
+    }
+    setSubscribing(true);
+    try {
+      const { error } = await supabase.from('newsletter_subscribers').insert({ email: email.trim().toLowerCase() });
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'თქვენ უკვე გამოწერილი ხართ!' });
+        } else throw error;
+      } else {
+        toast({ title: 'მადლობა! წარმატებით გამოწერილი ხართ.' });
+        setEmail('');
+      }
+    } catch (err) {
+      console.error('Newsletter subscribe error:', err);
+      toast({ title: 'შეცდომა, სცადეთ თავიდან', variant: 'destructive' });
+    } finally {
+      setSubscribing(false);
+    }
   };
 
   const getIcon = (platform) => {
@@ -117,11 +139,15 @@ const Footer = () => {
                 <input
                   type="email"
                   placeholder="Your Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNewsletterSubscribe()}
                   className="flex-1 px-5 py-3 rounded-full border border-slate-200 bg-white focus:outline-none focus:border-[#57c5cf] focus:ring-2 focus:ring-[#57c5cf]/20 transition-all font-body text-sm shadow-sm"
                 />
                 <button
-                  onClick={handleClick}
-                  className="w-12 h-12 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md absolute right-1 top-0 bottom-0 my-auto"
+                  onClick={handleNewsletterSubscribe}
+                  disabled={subscribing}
+                  className="w-12 h-12 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md absolute right-1 top-0 bottom-0 my-auto disabled:opacity-50"
                   style={{ backgroundColor: '#f292bc' }}
                 >
                   <Mail className="w-5 h-5 text-white" />
@@ -132,7 +158,7 @@ const Footer = () => {
 
           {/* Bottom Bar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-slate-200/60 font-body">
-            <p className="text-slate-500 text-sm font-medium">© 2025 Handicraft.com.ge. All rights reserved.</p>
+            <p className="text-slate-500 text-sm font-medium">© {new Date().getFullYear()} Handicraft.com.ge. All rights reserved.</p>
             
             {/* Smarketer Banner - Plain Image */}
             <a 

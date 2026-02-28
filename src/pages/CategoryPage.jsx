@@ -188,6 +188,8 @@ const CategoryPage = () => {
     <>
       <Helmet>
         <title>{`${currentCategoryName} - Handicraft`}</title>
+        <meta name="description" content={`${currentCategoryName} — აღმოაჩინეთ პრემიუმ ხარისხის ხელნაკეთი ${currentCategoryName} Handicraft-ისგან. უფასო მიწოდება ₾150+`} />
+        <link rel="canonical" href={`https://handicraft.com.ge/category/${categoryName}`} />
       </Helmet>
 
       {/* Filter Modal */}
@@ -392,6 +394,9 @@ const CategoryPage = () => {
                                 <img 
                                   src={product.image_url} 
                                   alt={displayName} 
+                                  loading="lazy"
+                                  width="400"
+                                  height="400"
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                 />
                             ) : (
