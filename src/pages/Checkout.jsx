@@ -29,8 +29,12 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
 
+  const subtotal = getCartTotal();
+  const shipping = subtotal > 150 ? 0 : 10;
+  const total = subtotal + shipping;
+
   useEffect(() => {
-    if (cartItems.length > 0) {
+    if (cartItems.length > 0 && total > 0) {
       trackBeginCheckout(cartItems, total);
     }
   }, []);
@@ -43,10 +47,6 @@ const Checkout = () => {
     };
     checkMode();
   }, []);
-
-  const subtotal = getCartTotal();
-  const shipping = subtotal > 150 ? 0 : 10;
-  const total = subtotal + shipping;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

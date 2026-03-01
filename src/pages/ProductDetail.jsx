@@ -78,6 +78,11 @@ const ProductDetail = () => {
     }
   }, [id]);
 
+  // Track product view — must be before any conditional returns (Rules of Hooks)
+  useEffect(() => {
+    if (product) trackViewItem(product);
+  }, [product?.id]);
+
   if (loading) return (
      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#57c5cf]"></div>
@@ -119,11 +124,6 @@ const ProductDetail = () => {
   if (!categoryName) categoryName = translations?.[categoryNameTranslationKey]?.ka || product.categories?.slug;
 
   const isOutOfStock = product.manage_inventory && product.stock_quantity === 0;
-
-  // Track product view
-  useEffect(() => {
-    if (product) trackViewItem(product);
-  }, [product?.id]);
 
   const handleAddToCart = () => {
     if(!isOutOfStock) {
