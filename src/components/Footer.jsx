@@ -169,7 +169,7 @@ const Footer = () => {
             >
               <img 
                 alt="Smarketer Banner" 
-                className="h-8 w-auto object-contain" 
+                className="h-[22px] w-auto object-contain" 
                 src="https://i.postimg.cc/yN4VXtXP/smarkter.png" 
               />
             </a>
