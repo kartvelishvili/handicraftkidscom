@@ -1,4 +1,4 @@
-# 🚀 Hostinger Deployment Guide
+# 🚀 Deployment Guide (Self-hosted Backend)
 
 ## ✅ Pre-Deployment Checklist
 
@@ -7,7 +7,12 @@
 - ✅ Branch: `main`
 - ✅ Latest commit pushed
 
-### 2. Hostinger Configuration
+### 2. Backend Server (ihost.ge)
+- PostgreSQL: `194.163.172.62:5432` (database: `site_handicraftkids_com`)
+- MinIO Storage: `https://ihost.ge/s3/site-handicraftkids-com`
+- API Server: Express.js (`server/index.js`) — runs on port 3001
+
+### 3. Hostinger Configuration (Frontend)
 
 #### Framework Settings:
 ```
@@ -31,8 +36,8 @@ Add these TWO variables:
 
 | Variable Name | Value |
 |---------------|-------|
-| `VITE_SUPABASE_URL` | `https://ubfzmfbjifnwoovgikkc.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViZnptZmJqaWZud29vdmdpa2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNTIyMjYsImV4cCI6MjA4MDkyODIyNn0.K0gfZMkXOAHHiBD5e8kU9cFgAQ3HS5kJydEk-5FK3CU` |
+| `VITE_API_URL` | `https://api.handicraftkids.com` (or your backend URL) |
+| `VITE_STORAGE_PUBLIC_URL` | `https://ihost.ge/s3/site-handicraftkids-com` |
 
 ⚠️ **WITHOUT THESE, THE SITE WILL NOT WORK** (blank pages, no products, no data)
 
@@ -44,7 +49,7 @@ Add these TWO variables:
 
 **Solution 1: Check Environment Variables**
 1. Go to Hostinger Panel → Environment Variables
-2. Verify both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` exist
+2. Verify both `VITE_API_URL` and `VITE_STORAGE_PUBLIC_URL` exist
 3. Re-deploy after adding variables
 
 **Solution 2: Check `.htaccess` file**
@@ -60,8 +65,8 @@ Add these TWO variables:
 4. Check Network tab for failed requests
 
 **Common Error Messages:**
-- `"Failed to fetch"` → Supabase env vars missing
-- `"Invalid API key"` → Wrong Supabase anon key
+- `"Failed to fetch"` → API env vars missing or backend not running
+- `"Unauthorized"` → Invalid auth token
 - `404 Not Found` → `.htaccess` not working
 
 ---
@@ -146,7 +151,7 @@ If still not working, contact Hostinger support with:
 - [ ] GitHub repo connected to Hostinger
 - [ ] Branch set to `main`
 - [ ] Node version set to 22.x
-- [ ] Environment variables added (VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY)
+- [ ] Environment variables added (VITE_API_URL + VITE_STORAGE_PUBLIC_URL)
 - [ ] Build completed successfully (check Hostinger logs)
 - [ ] Homepage loads (`/`)
 - [ ] Category page loads (`/category/all`)
