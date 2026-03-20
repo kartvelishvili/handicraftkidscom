@@ -355,28 +355,41 @@ app.get('/rest/v1/:table', async (req, res) => {
 
     // Handle joins: fetch related data for each row
     if (joins.length > 0) {
+      // Precheck which FK columns actually exist in join tables
+      const joinMeta = {};
+      for (const join of joins) {
+        const fkInCurrent = `${join.table.replace(/s$/, '')}_id`;
+        const fkInJoin = `${table.replace(/s$/, '')}_id`;
+        // Check if fkInJoin column exists in join table
+        const { rows: colCheck } = await pool.query(
+          `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
+          [join.table, fkInJoin]
+        );
+        joinMeta[join.table] = { fkInCurrent, fkInJoin, fkInJoinExists: colCheck.length > 0 };
+      }
+
       for (const row of rows) {
         for (const join of joins) {
-          // Determine FK: table_id in current table or current_table_id in join table
-          const fkInCurrent = `${join.table.replace(/s$/, '')}_id`; // e.g., category_id for categories
-          const fkInJoin = `${table.replace(/s$/, '')}_id`; // e.g., product_id for products
+          const { fkInCurrent, fkInJoin, fkInJoinExists } = joinMeta[join.table];
+          const joinCols = join.columns === '*' ? '*' : join.columns.split(',').map(c => `"${c.trim()}"`).join(', ');
 
           if (row[fkInCurrent] !== undefined && row[fkInCurrent] !== null) {
             // FK is in current table → fetch one from join table
-            const joinCols = join.columns === '*' ? '*' : join.columns.split(',').map(c => `"${c.trim()}"`).join(', ');
             const { rows: joinRows } = await pool.query(
               `SELECT ${joinCols} FROM "${join.table}" WHERE id = $1`,
               [row[fkInCurrent]]
             );
             row[join.table] = joinRows[0] || null;
-          } else {
+          } else if (fkInJoinExists) {
             // FK is in join table → fetch many
-            const joinCols = join.columns === '*' ? '*' : join.columns.split(',').map(c => `"${c.trim()}"`).join(', ');
             const { rows: joinRows } = await pool.query(
               `SELECT ${joinCols} FROM "${join.table}" WHERE "${fkInJoin}" = $1`,
               [row.id]
             );
             row[join.table] = joinRows;
+          } else {
+            // No FK relationship found, return null
+            row[join.table] = null;
           }
         }
       }
