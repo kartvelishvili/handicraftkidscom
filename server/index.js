@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import pool from './db.js';
 import { uploadFile, getPublicUrl, deleteFile, UPLOADS_DIR } from './storage.js';
+import { createBogOrder, getBogPaymentDetails, verifyBogCallback } from './bog-payment.js';
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -20,7 +21,15 @@ const SITE_URL = process.env.SITE_URL || 'https://handicraftkids.com';
 
 // ── Middleware ──
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, _res, buf) => {
+    // Save raw body for BOG callback signature verification
+    if (req.url === '/functions/v1/bog-callback') {
+      req.rawBody = buf.toString('utf-8');
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -689,6 +698,120 @@ app.post('/functions/v1/flitt-callback', async (req, res) => {
   } catch (err) {
     console.error('flitt-callback error:', err);
     res.status(500).send('Internal error');
+  }
+});
+
+// ── BOG Create Order ──
+app.post('/functions/v1/bog-create-order', async (req, res) => {
+  try {
+    const { order_id, amount_gel, cart_items, buyer } = req.body;
+
+    if (!order_id || !amount_gel) {
+      return res.status(400).json({ error: 'order_id and amount_gel are required' });
+    }
+
+    const callbackUrl = `${process.env.API_PUBLIC_URL || `https://handicraftkids.com/api`}/functions/v1/bog-callback`;
+    const successUrl = `${SITE_URL}/payment/bog/response?order_id=${order_id}&status=success`;
+    const failUrl = `${SITE_URL}/payment/bog/response?order_id=${order_id}&status=fail`;
+
+    const bogResponse = await createBogOrder({
+      orderId: order_id,
+      totalAmount: amount_gel,
+      cartItems: cart_items || [],
+      buyer: buyer || {},
+      callbackUrl,
+      successUrl,
+      failUrl,
+    });
+
+    const redirectUrl = bogResponse?._links?.redirect?.href;
+    const bogOrderId = bogResponse?.id;
+
+    if (!redirectUrl) {
+      return res.status(502).json({ error: 'No redirect URL from BOG' });
+    }
+
+    // Save BOG order ID
+    await pool.query(
+      `UPDATE orders SET payment_provider = 'bog', payment_order_id = $1, payment_status = 'pending' WHERE id = $2`,
+      [bogOrderId, order_id]
+    );
+
+    res.json({ redirect_url: redirectUrl, bog_order_id: bogOrderId });
+  } catch (err) {
+    console.error('bog-create-order error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── BOG Callback (webhook) ──
+app.post('/functions/v1/bog-callback', async (req, res) => {
+  try {
+    const rawBody = req.rawBody || JSON.stringify(req.body);
+
+    // Verify signature
+    const signature = req.headers['callback-signature'];
+    if (signature && !verifyBogCallback(rawBody, signature)) {
+      console.warn('BOG callback signature verification failed');
+      return res.status(403).send('Invalid signature');
+    }
+
+    const data = req.body;
+    const bogOrderId = data.body?.order_id;
+    const orderStatusKey = data.body?.order_status?.key;
+    const externalOrderId = data.body?.external_order_id;
+    const transactionId = data.body?.payment_detail?.transaction_id;
+
+    if (!bogOrderId) {
+      return res.status(400).send('Missing order_id');
+    }
+
+    // Find our order by external_order_id or payment_order_id
+    const { rows } = await pool.query(
+      `SELECT id, products FROM orders WHERE id = $1 OR payment_order_id = $2 LIMIT 1`,
+      [externalOrderId, bogOrderId]
+    );
+    const order = rows[0];
+    if (!order) {
+      console.warn('BOG callback: order not found', { bogOrderId, externalOrderId });
+      return res.status(200).send('OK'); // Return 200 to stop retries
+    }
+
+    // Map BOG status to our status
+    let paymentStatus = 'pending';
+    let orderStatus = 'new';
+    if (orderStatusKey === 'completed') { paymentStatus = 'paid'; orderStatus = 'processing'; }
+    else if (orderStatusKey === 'rejected') { paymentStatus = 'failed'; orderStatus = 'cancelled'; }
+    else if (orderStatusKey === 'refunded' || orderStatusKey === 'refunded_partially') { paymentStatus = 'refunded'; orderStatus = 'refunded'; }
+    else if (orderStatusKey === 'processing') { paymentStatus = 'pending'; orderStatus = 'processing'; }
+
+    await pool.query(
+      `UPDATE orders SET payment_status = $1, status = $2, payment_id = $3, payment_callback_data = $4, updated_at = NOW() WHERE id = $5`,
+      [paymentStatus, orderStatus, transactionId || bogOrderId, JSON.stringify(data), order.id]
+    );
+
+    // Decrement stock if paid
+    if (paymentStatus === 'paid' && order.products) {
+      for (const item of order.products) {
+        if (item.id) await pool.query('SELECT decrement_stock($1, $2)', [item.id, item.quantity || 1]);
+      }
+    }
+
+    console.log(`BOG callback: order ${order.id} → ${paymentStatus}`);
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('bog-callback error:', err);
+    res.status(200).send('OK'); // Return 200 to prevent retries
+  }
+});
+
+// ── BOG Payment Details ──
+app.get('/functions/v1/bog-payment-details/:bogOrderId', async (req, res) => {
+  try {
+    const details = await getBogPaymentDetails(req.params.bogOrderId);
+    res.json(details);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

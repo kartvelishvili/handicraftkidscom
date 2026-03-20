@@ -14,6 +14,7 @@ import GenericPage from '@/pages/GenericPage';
 import AboutUs from '@/pages/AboutUs';
 import UserProfile from '@/pages/UserProfile';
 import PaymentFlittResponse from '@/pages/PaymentFlittResponse';
+import PaymentBogResponse from '@/pages/PaymentBogResponse';
 import DotsPage from '@/pages/DotsPage';
 
 // Admin Imports
@@ -89,6 +90,7 @@ function App() {
                   {/* User Profile & Payment */}
                   <Route path="/profile" element={<UserProfile />} />
                   <Route path="/payment/flitt/response" element={<PaymentFlittResponse />} />
+                  <Route path="/payment/bog/response" element={<PaymentBogResponse />} />
                   
                   {/* Dynamic Pages */}
                   <Route path="/about" element={<AboutUs />} />

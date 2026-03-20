@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Truck, CreditCard, Banknote, AlertTriangle } from 'lucide-react';
+import { Check, Truck, CreditCard, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -27,7 +27,6 @@ const Checkout = () => {
   
   const [orderComplete, setOrderComplete] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(false);
 
   const subtotal = getCartTotal();
   const shipping = subtotal > 150 ? 0 : 10;
@@ -37,15 +36,6 @@ const Checkout = () => {
     if (cartItems.length > 0 && total > 0) {
       trackBeginCheckout(cartItems, total);
     }
-  }, []);
-
-  useEffect(() => {
-    // Check if we are in test mode to show banner
-    const checkMode = async () => {
-        const { data } = await supabase.from('flitt_settings').select('test_mode').single();
-        if (data?.test_mode) setIsTestMode(true);
-    };
-    checkMode();
   }, []);
 
   const handleInputChange = (e) => {
@@ -102,30 +92,38 @@ const Checkout = () => {
         if (orderError) throw orderError;
 
         if (formData.paymentMethod === 'card') {
-            // 2. Call Flitt Edge Function
-            const response = await supabase.functions.invoke('flitt-create-order', {
+            // 2. Call BOG Payment API
+            const response = await supabase.functions.invoke('bog-create-order', {
                 body: {
                     order_id: order.id,
                     amount_gel: total,
-                    description: `Order #${order.order_number}`,
-                    customer_email: formData.email
+                    cart_items: cartItems.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        image_url: item.image_url || item.image,
+                    })),
+                    buyer: {
+                        fullName: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                    }
                 }
             });
 
             if (response.error) {
-                console.error('Flitt edge function error:', response.error);
+                console.error('BOG payment error:', response.error);
                 throw new Error(response.error.message || 'Payment service error');
             }
             
             const responseData = response.data;
-            const redirectUrl = responseData?.url || responseData?.checkout_url; 
+            const redirectUrl = responseData?.redirect_url;
 
             if (redirectUrl) {
-                console.log('Redirecting to Flitt checkout:', redirectUrl);
                 window.location.href = redirectUrl;
                 return;
             } else {
-                console.error('No redirect URL in response:', responseData);
                 throw new Error(responseData?.error || "No redirect URL received from payment provider");
             }
         } else {
@@ -202,16 +200,6 @@ const Checkout = () => {
       </Helmet>
       
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-8 text-center text-[#57c5cf]">შეკვეთის გაფორმება</h1>
-
-      {isTestMode && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg flex items-center gap-3">
-              <AlertTriangle className="text-yellow-600 w-6 h-6" />
-              <div>
-                  <p className="font-bold text-yellow-800">სატესტო რეჟიმი</p>
-                  <p className="text-sm text-yellow-700">გადახდის სისტემა მუშაობს სატესტო რეჟიმში. თანხა არ ჩამოიჭრება.</p>
-              </div>
-          </div>
-      )}
 
       <div className="flex flex-col lg:flex-row gap-8 md:gap-12">
         {/* Checkout Form */}
