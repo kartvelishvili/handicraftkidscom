@@ -29,7 +29,6 @@ const ProductDetail = () => {
       setLoading(true);
       try {
         console.log("[ProductDetail] Product ID from URL:", id);
-        console.log("[ProductDetail] Supabase URL:", import.meta.env.VITE_SUPABASE_URL || 'Using fallback');
         
         // Fetch Product
         const { data: productData, error } = await supabase
@@ -39,7 +38,7 @@ const ProductDetail = () => {
           .single();
           
         if (error) {
-            console.error("[ProductDetail] Supabase Error:", error);
+            console.error("[ProductDetail] API Error:", error);
             console.error("[ProductDetail] Error details:", JSON.stringify(error));
             throw error;
         }

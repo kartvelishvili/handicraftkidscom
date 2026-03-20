@@ -93,7 +93,7 @@ const AdminPages = () => {
         .eq('id', selectedPage.id)
         .select();
 
-      console.log("Supabase Update Response:", { data, error });
+      console.log("Update Response:", { data, error });
 
       if (error) throw error;
       

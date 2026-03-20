@@ -2,8 +2,8 @@
  * Order Notification Service
  * Orchestrates SMS + Email notifications after order placement
  * 
- * SMS: smsoffice.ge API (via Supabase Edge Function)
- * Email: Resend API (via Supabase Edge Function)
+ * SMS: smsoffice.ge API (via server Edge Function)
+ * Email: Resend API (via server Edge Function)
  * 
  * Provider: SmarketerGE
  * Domain: www.handicraft.com.ge
@@ -67,7 +67,7 @@ export const sendOrderNotifications = async (order) => {
 };
 
 /**
- * Send via Supabase Edge Function (server-side, handles SMS + Email + notifications)
+ * Send via server Edge Function (server-side, handles SMS + Email + notifications)
  * This is the preferred method as it runs server-side with no CORS issues
  */
 export const sendOrderNotificationsViaEdgeFunction = async (order) => {
