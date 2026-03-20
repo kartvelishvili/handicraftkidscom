@@ -27,10 +27,29 @@ const Checkout = () => {
   
   const [orderComplete, setOrderComplete] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [deliverySettings, setDeliverySettings] = useState({ enabled: true, free_threshold: 150, delivery_fee: 10 });
 
   const subtotal = getCartTotal();
-  const shipping = subtotal > 150 ? 0 : 10;
+  const shipping = deliverySettings.enabled
+    ? (deliverySettings.free_threshold > 0 && subtotal > deliverySettings.free_threshold ? 0 : deliverySettings.delivery_fee)
+    : 0;
   const total = subtotal + shipping;
+
+  useEffect(() => {
+    const fetchDelivery = async () => {
+      try {
+        const { data } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'delivery')
+          .single();
+        if (data?.value) setDeliverySettings(data.value);
+      } catch (e) {
+        console.error('Failed to load delivery settings', e);
+      }
+    };
+    fetchDelivery();
+  }, []);
 
   useEffect(() => {
     if (cartItems.length > 0 && total > 0) {
@@ -233,6 +252,7 @@ const Checkout = () => {
             </section>
 
             {/* Shipping Info */}
+            {deliverySettings.enabled && (
             <section className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
               <h2 className="text-xl font-heading font-bold mb-6 flex items-center gap-2">
                 <span className="w-8 h-8 rounded-full bg-[#f292bc] text-white flex items-center justify-center text-sm">2</span>
@@ -249,11 +269,12 @@ const Checkout = () => {
                 </div>
               </div>
             </section>
+            )}
 
             {/* Payment Method */}
             <section className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
               <h2 className="text-xl font-heading font-bold mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-[#57c5cf] text-white flex items-center justify-center text-sm">3</span>
+                <span className="w-8 h-8 rounded-full bg-[#57c5cf] text-white flex items-center justify-center text-sm">{deliverySettings.enabled ? 3 : 2}</span>
                 გადახდის მეთოდი
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
@@ -307,10 +328,12 @@ const Checkout = () => {
                  <span className="text-gray-600">ქვე-ჯამი</span>
                  <span className="font-bold">₾{subtotal.toFixed(2)}</span>
                </div>
+               {deliverySettings.enabled && (
                <div className="flex justify-between">
                  <span className="text-gray-600">მიწოდება</span>
                  <span className="font-bold text-[#57c5cf]">{shipping === 0 ? 'უფასო' : `₾${shipping.toFixed(2)}`}</span>
                </div>
+               )}
                <div className="flex justify-between text-lg pt-4 border-t border-gray-200">
                  <span className="font-heading font-bold text-gray-800">სულ:</span>
                  <span className="font-heading font-bold text-[#f292bc]">₾{total.toFixed(2)}</span>

@@ -23,6 +23,8 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [additionalImages, setAdditionalImages] = useState([]);
+  const [selectedAttrName, setSelectedAttrName] = useState(null);
+  const [selectedAttrPrice, setSelectedAttrPrice] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -126,8 +128,11 @@ const ProductDetail = () => {
 
   const handleAddToCart = () => {
     if(!isOutOfStock) {
-      addToCart(product, quantity);
-      trackAddToCart(product, quantity);
+      const productWithPrice = selectedAttrPrice != null 
+        ? { ...product, price: selectedAttrPrice }
+        : product;
+      addToCart(productWithPrice, quantity);
+      trackAddToCart(productWithPrice, quantity);
       toast({ 
         title: "კალათაში დაემატა!",
         description: `${quantity} x ${displayName}`,
@@ -239,8 +244,11 @@ const ProductDetail = () => {
                   
                   <div className="flex flex-wrap items-center gap-6 mb-6">
                      <div className="text-3xl font-bold font-heading text-[#57c5cf]">
-                        ₾{product.price}
+                        ₾{selectedAttrPrice ?? product.price}
                      </div>
+                     {selectedAttrPrice != null && selectedAttrPrice !== Number(product.price) && (
+                       <span className="text-sm text-gray-400 line-through">₾{product.price}</span>
+                     )}
                      <div className="w-px h-8 bg-gray-200"></div>
                      {product.rating && (
                        <div className="flex items-center gap-1">
@@ -262,7 +270,15 @@ const ProductDetail = () => {
                         <Package className="w-4 h-4 text-[#57c5cf]" /> მახასიათებლები
                      </h3>
                      <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                        <AttributeDisplay initialAttributes={productAttributes} language={language} />
+                        <AttributeDisplay 
+                          initialAttributes={productAttributes} 
+                          language={language}
+                          onPriceSelect={(name, price) => {
+                            setSelectedAttrName(name);
+                            setSelectedAttrPrice(price);
+                          }}
+                          selectedAttrName={selectedAttrName}
+                        />
                      </div>
                   </div>
                )}

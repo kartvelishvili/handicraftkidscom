@@ -39,6 +39,8 @@ import AdminImport from '@/pages/AdminImport';
 import AdminNotificationSettings from '@/pages/AdminNotificationSettings';
 import AdminNotificationHistory from '@/pages/AdminNotificationHistory';
 import AdminSmsSettings from '@/pages/AdminSmsSettings';
+import AdminDelivery from '@/pages/AdminDelivery';
+import AdminPaymentHistory from '@/pages/AdminPaymentHistory';
 import AdminLayout from '@/components/AdminLayout';
 import AdminErrorBoundary from '@/components/AdminErrorBoundary';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute';
@@ -135,6 +137,8 @@ function App() {
                     <Route path="flitt-settings" element={<AdminFlittSettings />} />
                     <Route path="notifications-settings" element={<AdminNotificationSettings />} />
                     <Route path="notifications" element={<AdminNotificationHistory />} />
+                    <Route path="delivery" element={<AdminDelivery />} />
+                    <Route path="payment-history" element={<AdminPaymentHistory />} />
                   </Route>
                 </Routes>
                 </ErrorBoundary>

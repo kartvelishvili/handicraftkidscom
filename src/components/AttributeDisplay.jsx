@@ -10,7 +10,9 @@ const AttributeDisplay = ({
   compact = false, 
   showLabel = true,
   className,
-  language // passed from parent or we can use context
+  language, // passed from parent or we can use context
+  onPriceSelect, // callback when an attribute with price is selected
+  selectedAttrName // currently selected attribute name for price highlight
 }) => {
   const [attributes, setAttributes] = useState(initialAttributes || []);
   const [loading, setLoading] = useState(!initialAttributes);
@@ -73,14 +75,21 @@ const AttributeDisplay = ({
         if (currentLang === 'en' && attr.attribute_value_en) val = attr.attribute_value_en;
         if (currentLang === 'ru' && attr.attribute_value_ru) val = attr.attribute_value_ru;
 
+        const hasPrice = attr.price != null && attr.price > 0;
+        const isSelected = selectedAttrName === attr.attribute_name;
+        const isClickable = hasPrice && onPriceSelect;
+
         return (
             <span 
-                key={`${attr.id || idx}-${attr.attribute_name}`} 
+                key={`${attr.id || idx}-${attr.attribute_name}`}
+                onClick={isClickable ? () => onPriceSelect(attr.attribute_name, attr.price) : undefined}
                 className={cn(
                     "inline-flex items-center rounded-md font-medium transition-colors",
                     compact 
                     ? "bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.5 text-[10px]" 
-                    : "bg-[#57c5cf]/10 text-[#57c5cf] border border-[#57c5cf]/20 px-3 py-1 text-sm shadow-sm"
+                    : "bg-[#57c5cf]/10 text-[#57c5cf] border border-[#57c5cf]/20 px-3 py-1 text-sm shadow-sm",
+                    isClickable && "cursor-pointer hover:bg-[#57c5cf]/20 hover:border-[#57c5cf]/40",
+                    isSelected && "ring-2 ring-[#57c5cf] bg-[#57c5cf]/20 border-[#57c5cf]"
                 )}
             >
             {showLabel && (
@@ -89,6 +98,9 @@ const AttributeDisplay = ({
                 </span>
             )}
             <span className="font-bold">{val}</span>
+            {hasPrice && !compact && (
+                <span className="ml-1.5 text-[#f292bc] font-bold text-xs">₾{attr.price}</span>
+            )}
             </span>
         );
       })}

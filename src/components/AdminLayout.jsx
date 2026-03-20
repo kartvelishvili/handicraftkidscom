@@ -33,7 +33,9 @@ import {
   Store,
   Palette,
   Megaphone,
-  Cog
+  Cog,
+  Truck,
+  Receipt
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -55,6 +57,7 @@ const AdminLayout = () => {
       items: [
         { icon: LayoutDashboard, label: 'მთავარი', path: '/admin/dashboard' },
         { icon: ClipboardList, label: 'შეკვეთები', path: '/admin/orders', badge: true },
+        { icon: Receipt, label: 'გადახდები', path: '/admin/payment-history' },
       ]
     },
     {
@@ -85,6 +88,7 @@ const AdminLayout = () => {
     {
       label: 'პარამეტრები',
       items: [
+        { icon: Truck, label: 'მიწოდება', path: '/admin/delivery' },
         { icon: Settings, label: 'ფუტერი', path: '/admin/footer' },
         { icon: Languages, label: 'თარგმანები', path: '/admin/settings' },
         { icon: CreditCard, label: 'Flitt გადახდა', path: '/admin/flitt-settings' },

@@ -95,7 +95,8 @@ const AdminProductEdit = () => {
             attribute_value: a.attribute_value,
             attribute_value_en: a.attribute_value_en,
             attribute_value_ru: a.attribute_value_ru,
-            attribute_type: a.attribute_type
+            attribute_type: a.attribute_type,
+            price: a.price || null
           })));
         }
       }
@@ -179,7 +180,8 @@ const AdminProductEdit = () => {
           attribute_type: type,
           attribute_value: '',
           attribute_value_en: '',
-          attribute_value_ru: ''
+          attribute_value_ru: '',
+          price: null
         };
         if (lang === 'ka') newAttr.attribute_value = value;
         if (lang === 'en') newAttr.attribute_value_en = value;
@@ -187,6 +189,18 @@ const AdminProductEdit = () => {
         
         return [...prev, newAttr];
       }
+    });
+  };
+
+  const handleAttributePriceChange = (attrName, price) => {
+    setProductAttributes(prev => {
+      const existingIndex = prev.findIndex(p => p.attribute_name === attrName);
+      if (existingIndex >= 0) {
+        const newAttrs = [...prev];
+        newAttrs[existingIndex].price = price === '' ? null : Number(price);
+        return newAttrs;
+      }
+      return prev;
     });
   };
 
@@ -207,7 +221,8 @@ const AdminProductEdit = () => {
            attribute_value: pa.attribute_value,
            attribute_value_en: pa.attribute_value_en,
            attribute_value_ru: pa.attribute_value_ru,
-           attribute_type: pa.attribute_type
+           attribute_type: pa.attribute_type,
+           price: pa.price || null
         }));
       
       console.log("Attributes payload:", attributesToInsert);
@@ -449,6 +464,7 @@ const AdminProductEdit = () => {
                           <Layers className="w-5 h-5 text-[#57c5cf]" /> 
                           მახასიათებლები ({activeTab.toUpperCase()})
                        </h3>
+                       <span className="text-xs text-gray-400">ფასი = ზომის მიხედვით ფასი</span>
                     </div>
 
                     <div className="space-y-6">
@@ -471,13 +487,25 @@ const AdminProductEdit = () => {
                                   {attr.attribute_name}
                                </label>
                                
-                               <input 
-                                  type="text"
-                                  value={currentValue}
-                                  onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
-                                  className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
-                                  placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
-                               />
+                               <div className="flex gap-3">
+                                 <input 
+                                    type="text"
+                                    value={currentValue}
+                                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
+                                    className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
+                                    placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
+                                 />
+                                 <div className="w-32 flex-shrink-0">
+                                   <input 
+                                      type="number"
+                                      step="0.01"
+                                      value={currentAttr?.price ?? ''}
+                                      onChange={(e) => handleAttributePriceChange(attr.attribute_name, e.target.value)}
+                                      className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#f292bc] outline-none font-mono"
+                                      placeholder="₾ ფასი"
+                                   />
+                                 </div>
+                               </div>
                             </div>
                           );
                        })}
