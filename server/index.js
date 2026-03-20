@@ -13,6 +13,7 @@ import fs from 'fs';
 import pool from './db.js';
 import { uploadFile, getPublicUrl, deleteFile, UPLOADS_DIR } from './storage.js';
 import { createBogOrder, getBogPaymentDetails, verifyBogCallback } from './bog-payment.js';
+import { cacheGet, cacheSet, cacheInvalidate, buildCacheKey, getTTL } from './cache.js';
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -315,6 +316,11 @@ app.get('/rest/v1/:table', async (req, res) => {
     const table = req.params.table;
     const { select, order, limit, offset, ...filters } = req.query;
 
+    // Check Redis cache
+    const cacheKey = buildCacheKey(req);
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
     const { columns, joins } = parseSelect(select, table);
 
     let sql = `SELECT ${columns === '*' ? `"${table}".*` : columns} FROM "${table}"`;
@@ -353,14 +359,12 @@ app.get('/rest/v1/:table', async (req, res) => {
 
     const { rows } = await pool.query(sql, values);
 
-    // Handle joins: fetch related data for each row
+    // Handle joins: batch fetch related data (avoids N+1 queries)
     if (joins.length > 0) {
-      // Precheck which FK columns actually exist in join tables
       const joinMeta = {};
       for (const join of joins) {
         const fkInCurrent = `${join.table.replace(/s$/, '')}_id`;
         const fkInJoin = `${table.replace(/s$/, '')}_id`;
-        // Check if fkInJoin column exists in join table
         const { rows: colCheck } = await pool.query(
           `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
           [join.table, fkInJoin]
@@ -368,29 +372,43 @@ app.get('/rest/v1/:table', async (req, res) => {
         joinMeta[join.table] = { fkInCurrent, fkInJoin, fkInJoinExists: colCheck.length > 0 };
       }
 
-      for (const row of rows) {
-        for (const join of joins) {
-          const { fkInCurrent, fkInJoin, fkInJoinExists } = joinMeta[join.table];
-          const joinCols = join.columns === '*' ? '*' : join.columns.split(',').map(c => `"${c.trim()}"`).join(', ');
+      for (const join of joins) {
+        const { fkInCurrent, fkInJoin, fkInJoinExists } = joinMeta[join.table];
+        const joinCols = join.columns === '*' ? '*' : join.columns.split(',').map(c => `"${c.trim()}"`).join(', ');
 
-          if (row[fkInCurrent] !== undefined && row[fkInCurrent] !== null) {
-            // FK is in current table → fetch one from join table
-            const { rows: joinRows } = await pool.query(
-              `SELECT ${joinCols} FROM "${join.table}" WHERE id = $1`,
-              [row[fkInCurrent]]
-            );
-            row[join.table] = joinRows[0] || null;
-          } else if (fkInJoinExists) {
-            // FK is in join table → fetch many
-            const { rows: joinRows } = await pool.query(
-              `SELECT ${joinCols} FROM "${join.table}" WHERE "${fkInJoin}" = $1`,
-              [row.id]
-            );
-            row[join.table] = joinRows;
-          } else {
-            // No FK relationship found, return null
-            row[join.table] = null;
+        // Determine which batch strategy to use
+        const fkValues = rows.map(r => r[fkInCurrent]).filter(v => v != null);
+        const idValues = rows.map(r => r.id).filter(v => v != null);
+
+        if (fkValues.length > 0) {
+          // FK in current table → batch fetch from join table by IDs
+          const uniqueIds = [...new Set(fkValues)];
+          const { rows: joinRows } = await pool.query(
+            `SELECT ${joinCols} FROM "${join.table}" WHERE id = ANY($1::uuid[])`,
+            [uniqueIds]
+          );
+          const joinMap = {};
+          for (const jr of joinRows) joinMap[jr.id] = jr;
+          for (const row of rows) {
+            row[join.table] = row[fkInCurrent] ? (joinMap[row[fkInCurrent]] || null) : null;
           }
+        } else if (fkInJoinExists && idValues.length > 0) {
+          // FK in join table → batch fetch all related rows
+          const { rows: joinRows } = await pool.query(
+            `SELECT ${joinCols}${joinCols === '*' ? '' : `, "${fkInJoin}"`} FROM "${join.table}" WHERE "${fkInJoin}" = ANY($1::uuid[])`,
+            [idValues]
+          );
+          const joinMap = {};
+          for (const jr of joinRows) {
+            const key = jr[fkInJoin];
+            if (!joinMap[key]) joinMap[key] = [];
+            joinMap[key].push(jr);
+          }
+          for (const row of rows) {
+            row[join.table] = joinMap[row.id] || [];
+          }
+        } else {
+          for (const row of rows) row[join.table] = null;
         }
       }
     }
@@ -403,6 +421,9 @@ app.get('/rest/v1/:table', async (req, res) => {
       const { rows: countRows } = await pool.query(countSql, values);
       res.set('content-range', `0-${rows.length}/${countRows[0].count}`);
     }
+
+    // Cache the result
+    await cacheSet(cacheKey, rows, getTTL(table));
 
     res.json(rows);
   } catch (err) {
@@ -457,6 +478,9 @@ app.post('/rest/v1/:table', async (req, res) => {
       if (returnData && rows[0]) results.push(rows[0]);
     }
 
+    // Invalidate cache for this table
+    await cacheInvalidate(`rest:/rest/v1/${table}*`);
+
     if (returnData) {
       res.status(201).json(results);
     } else {
@@ -505,6 +529,10 @@ app.patch('/rest/v1/:table', async (req, res) => {
     if (returnData) sql += ' RETURNING *';
 
     const { rows } = await pool.query(sql, values);
+
+    // Invalidate cache for this table
+    await cacheInvalidate(`rest:/rest/v1/${table}*`);
+
     res.json(returnData ? rows : {});
   } catch (err) {
     console.error('PATCH /rest/v1 error:', err.message);
@@ -539,6 +567,10 @@ app.delete('/rest/v1/:table', async (req, res) => {
     if (returnData) sql += ' RETURNING *';
 
     const { rows } = await pool.query(sql, values);
+
+    // Invalidate cache for this table
+    await cacheInvalidate(`rest:/rest/v1/${table}*`);
+
     res.json(returnData ? rows : {});
   } catch (err) {
     console.error('DELETE /rest/v1 error:', err.message);
@@ -1156,8 +1188,19 @@ app.get('/rest/v1/realtime/changes', async (req, res) => {
     const sinceDate = since || new Date(Date.now() - 30000).toISOString();
 
     if (table) {
+      // Check which timestamp columns exist in the table
+      const { rows: cols } = await pool.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name IN ('created_at', 'updated_at')`,
+        [table]
+      );
+      const colNames = cols.map(c => c.column_name);
+      if (colNames.length === 0) {
+        return res.json([]);
+      }
+      const conditions = colNames.map(c => `"${c}" > $1`).join(' OR ');
+      const orderCol = colNames.includes('created_at') ? 'created_at' : colNames[0];
       const { rows } = await pool.query(
-        `SELECT * FROM "${table}" WHERE created_at > $1 OR updated_at > $1 ORDER BY created_at DESC LIMIT 50`,
+        `SELECT * FROM "${table}" WHERE ${conditions} ORDER BY "${orderCol}" DESC LIMIT 50`,
         [sinceDate]
       );
       res.json(rows);
