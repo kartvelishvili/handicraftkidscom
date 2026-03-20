@@ -1,0 +1,16 @@
+node_modules/
+package-lock.json
+uploads/
+
+# Temp test/migration/debug scripts (not needed in repo)
+test-*.js
+fix-*.js
+debug-*.js
+scan-*.js
+verify-*.js
+migrate-*.js
+revert-*.js
+upload-to-s3.js
+check-*.js
+explore-*.js
+backup-supabase.json
