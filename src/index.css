@@ -1,0 +1,16 @@
+@import url('//cdn.web-fonts.ge/fonts/bpg-glaho-bold/css/bpg-glaho-bold.min.css');
+@import url('//cdn.web-fonts.ge/fonts/bpg-ucnobi/css/bpg-ucnobi.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body bg-slate-50;
+  }
+  
+  h1, h2, h3, h4, h5, h6, button {
+    @apply font-heading;
+  }
+}

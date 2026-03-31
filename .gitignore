@@ -1,6 +1,44 @@
+<<<<<<< HEAD
 node_modules/
 .env
 .env.docker
 .env.local
 .env.production
 *.log
+=======
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment variables
+.env
+.env.docker
+.env.local
+.env.production
+.env.*.local
+.env.production.local
+
+# Build output
+dist/
+build/
+*.js.map
+*.css.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+.jest/
+
+# Temporary
+*.tmp
+temp/
+>>>>>>> 6dc18f5309735cbc80c111326ec710a22428897c
