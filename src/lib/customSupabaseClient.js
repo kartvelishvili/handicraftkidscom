@@ -3,7 +3,7 @@
 // Supports: .from().select().eq()... / .storage / .auth / .functions / .rpc
 // ============================================================
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://handicraftkids.ihost.ge';
 
 // ────────────────────────────────────────────
 // Auth state management
