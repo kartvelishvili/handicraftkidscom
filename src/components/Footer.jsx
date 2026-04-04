@@ -1,16 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Instagram, Twitter, Mail, Linkedin, Lock } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Facebook, Instagram, Twitter, Mail, Linkedin, MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Footer = () => {
-  const { toast } = useToast();
   const { t } = useLanguage();
   const [settings, setSettings] = useState(null);
-  const [email, setEmail] = useState('');
-  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -20,30 +16,6 @@ const Footer = () => {
     };
     fetchSettings();
   }, []);
-
-  const handleNewsletterSubscribe = async () => {
-    if (!email || !email.includes('@')) {
-      toast({ title: 'გთხოვთ ჩაწერეთ სწორი ელ-ფოსტა', variant: 'destructive' });
-      return;
-    }
-    setSubscribing(true);
-    try {
-      const { error } = await supabase.from('newsletter_subscribers').insert({ email: email.trim().toLowerCase() });
-      if (error) {
-        if (error.code === '23505') {
-          toast({ title: 'თქვენ უკვე გამოწერილი ხართ!' });
-        } else throw error;
-      } else {
-        toast({ title: 'მადლობა! წარმატებით გამოწერილი ხართ.' });
-        setEmail('');
-      }
-    } catch (err) {
-      console.error('Newsletter subscribe error:', err);
-      toast({ title: 'შეცდომა, სცადეთ თავიდან', variant: 'destructive' });
-    } finally {
-      setSubscribing(false);
-    }
-  };
 
   const getIcon = (platform) => {
     switch(platform) {
@@ -77,10 +49,6 @@ const Footer = () => {
                  className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                />
               </Link>
-              <p className="text-slate-600 leading-relaxed font-body text-base max-w-sm">
-                {t('footer_desc')}
-              </p>
-              
               <div className="flex gap-3 pt-2">
                 {settings?.social_links?.map((link, i) => (
                   <a 
@@ -95,11 +63,6 @@ const Footer = () => {
                   </a>
                 ))}
               </div>
-
-               <Link to="/paneli" className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-[#57c5cf] transition-colors mt-2 font-medium">
-                <Lock className="w-3 h-3" />
-                <span>Admin Panel</span>
-              </Link>
             </div>
 
             {/* Shop Links */}
@@ -128,31 +91,23 @@ const Footer = () => {
               </nav>
             </div>
 
-            {/* Newsletter */}
+            {/* Messenger */}
             <div className="md:col-span-3">
               <h3 className="font-heading font-bold text-lg mb-6 relative inline-block text-slate-800">
-                {t('nav_newsletter')}
+                {t('nav_contact')}
                 <span className="absolute -bottom-2 left-0 w-8 h-1 rounded-full bg-[#57c5cf]"></span>
               </h3>
-              <p className="text-slate-600 mb-6 font-body text-sm leading-relaxed">{t('newsletter_desc')}</p>
-              <div className="flex gap-2 relative">
-                <input
-                  type="email"
-                  placeholder="Your Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleNewsletterSubscribe()}
-                  className="flex-1 px-5 py-3 rounded-full border border-slate-200 bg-white focus:outline-none focus:border-[#57c5cf] focus:ring-2 focus:ring-[#57c5cf]/20 transition-all font-body text-sm shadow-sm"
-                />
-                <button
-                  onClick={handleNewsletterSubscribe}
-                  disabled={subscribing}
-                  className="w-12 h-12 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md absolute right-1 top-0 bottom-0 my-auto disabled:opacity-50"
-                  style={{ backgroundColor: '#f292bc' }}
-                >
-                  <Mail className="w-5 h-5 text-white" />
-                </button>
-              </div>
+              <p className="text-slate-600 mb-6 font-body text-sm leading-relaxed">{t('footer_messenger_desc') || 'მოგვწერეთ Facebook-ზე და მალე დაგიკავშირდებით!'}</p>
+              <a
+                href="https://m.me/handicraftGeorgia"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-3.5 rounded-full text-white font-heading font-bold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+                style={{ background: 'linear-gradient(135deg, #0084FF 0%, #00C6FF 100%)' }}
+              >
+                <MessageCircle className="w-5 h-5" />
+                მოგვწერეთ Messenger-ზე
+              </a>
             </div>
           </div>
 
