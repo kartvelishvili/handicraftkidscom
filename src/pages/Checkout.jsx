@@ -28,6 +28,22 @@ const Checkout = () => {
   const [orderComplete, setOrderComplete] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [deliverySettings, setDeliverySettings] = useState({ enabled: true, free_threshold: 150, delivery_fee: 10 });
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.firstName.trim()) errors.firstName = 'სახელი სავალდებულოა';
+    if (!formData.lastName.trim()) errors.lastName = 'გვარი სავალდებულოა';
+    if (!formData.email.trim()) errors.email = 'ელ-ფოსტა სავალდებულოა';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'არასწორი ელ-ფოსტის ფორმატი';
+    if (!formData.phone.trim()) errors.phone = 'მობილური სავალდებულოა';
+    if (deliverySettings.enabled) {
+      if (!formData.city.trim()) errors.city = 'ქალაქი სავალდებულოა';
+      if (!formData.address.trim()) errors.address = 'მისამართი სავალდებულოა';
+    }
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const subtotal = getCartTotal();
   const shipping = deliverySettings.enabled
@@ -88,27 +104,20 @@ const Checkout = () => {
      }
   };
 
-  const validateForm = () => {
-    const { firstName, lastName, email, phone, city, address } = formData;
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim()) {
-      toast({ variant: 'destructive', title: 'შეავსეთ საკონტაქტო ინფორმაცია', description: 'სახელი, გვარი, ელ-ფოსტა და ტელეფონი სავალდებულოა.' });
-      return false;
-    }
-    if (deliverySettings.enabled && (!city.trim() || !address.trim())) {
-      toast({ variant: 'destructive', title: 'შეავსეთ მისამართი', description: 'ქალაქი და მისამართი სავალდებულოა.' });
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast({ variant: 'destructive', title: 'არასწორი ელ-ფოსტა', description: 'გთხოვთ შეიყვანოთ სწორი ელ-ფოსტის მისამართი.' });
-      return false;
-    }
-    return true;
-  };
-
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (!validateForm()) return;
+    
+    if (!validateForm()) {
+      toast({
+        variant: "destructive",
+        title: "შეავსეთ სავალდებულო ველები",
+        description: "გთხოვთ შეავსოთ საკონტაქტო ინფორმაცია და მისამართი."
+      });
+      // Scroll to first error
+      const firstErrorField = document.querySelector('.checkout-field-error');
+      if (firstErrorField) firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setIsProcessing(true);
 
     try {
@@ -253,19 +262,23 @@ const Checkout = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">სახელი</label>
-                  <input required name="firstName" value={formData.firstName} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#57c5cf] font-body" placeholder="გიორგი" />
+                  <input required name="firstName" value={formData.firstName} onChange={(e) => { handleInputChange(e); if (validationErrors.firstName) setValidationErrors(p => ({...p, firstName: undefined})); }} className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.firstName ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#57c5cf]'}`} placeholder="გიორგი" />
+                  {validationErrors.firstName && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">გვარი</label>
-                  <input required name="lastName" value={formData.lastName} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#57c5cf] font-body" placeholder="ბერიძე" />
+                  <input required name="lastName" value={formData.lastName} onChange={(e) => { handleInputChange(e); if (validationErrors.lastName) setValidationErrors(p => ({...p, lastName: undefined})); }} className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.lastName ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#57c5cf]'}`} placeholder="ბერიძე" />
+                  {validationErrors.lastName && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.lastName}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">ელ-ფოსტა</label>
-                  <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#57c5cf] font-body" placeholder="giorgi@example.com" />
+                  <input required type="email" name="email" value={formData.email} onChange={(e) => { handleInputChange(e); if (validationErrors.email) setValidationErrors(p => ({...p, email: undefined})); }} className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.email ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#57c5cf]'}`} placeholder="giorgi@example.com" />
+                  {validationErrors.email && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.email}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">მობილური</label>
-                  <input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#57c5cf] font-body" placeholder="555 12 34 56" />
+                  <input required type="tel" name="phone" value={formData.phone} onChange={(e) => { handleInputChange(e); if (validationErrors.phone) setValidationErrors(p => ({...p, phone: undefined})); }} className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.phone ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#57c5cf]'}`} placeholder="555 12 34 56" />
+                  {validationErrors.phone && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.phone}</p>}
                 </div>
               </div>
             </section>
@@ -280,11 +293,13 @@ const Checkout = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">ქალაქი / რაიონი</label>
-                  <input required name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#f292bc] font-body" placeholder="თბილისი" />
+                  <input required name="city" value={formData.city} onChange={(e) => { handleInputChange(e); if (validationErrors.city) setValidationErrors(p => ({...p, city: undefined})); }} className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.city ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#f292bc]'}`} placeholder="თბილისი" />
+                  {validationErrors.city && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.city}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 font-body">ზუსტი მისამართი</label>
-                  <textarea required name="address" value={formData.address} onChange={handleInputChange} rows="3" className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#f292bc] font-body" placeholder="ქუჩა, კორპუსი, ბინა..." />
+                  <textarea required name="address" value={formData.address} onChange={(e) => { handleInputChange(e); if (validationErrors.address) setValidationErrors(p => ({...p, address: undefined})); }} rows="3" className={`w-full px-4 py-3 rounded-xl border focus:outline-none font-body ${validationErrors.address ? 'border-red-400 bg-red-50/50 checkout-field-error' : 'border-gray-200 focus:border-[#f292bc]'}`} placeholder="ქუჩა, კორპუსი, ბინა..." />
+                  {validationErrors.address && <p className="text-red-500 text-xs mt-1 font-bold">{validationErrors.address}</p>}
                 </div>
               </div>
             </section>
@@ -364,7 +379,7 @@ const Checkout = () => {
                </div>
             </div>
 
-            <Button onClick={(e) => handleSubmit(e)} disabled={isProcessing} className="hidden lg:flex w-full py-6 text-lg font-heading rounded-full bg-[#57c5cf] hover:bg-[#4bc0cb] hover:shadow-lg transition-all">
+            <Button onClick={() => handleSubmit()} disabled={isProcessing} className="hidden lg:flex w-full py-6 text-lg font-heading rounded-full bg-[#57c5cf] hover:bg-[#4bc0cb] hover:shadow-lg transition-all">
                {isProcessing ? 'მუშავდება...' : 'შეკვეთის დასრულება'}
             </Button>
             

@@ -62,6 +62,7 @@ const PaymentFlittResponse = () => {
 
           // Clear cart
           clearCart();
+          localStorage.removeItem('cartItems');
 
           // Send all notifications if not already processed
           if (!order.sms_sent_to_admin || !order.sms_sent_to_customer || !order.email_sent_to_customer) {

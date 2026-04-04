@@ -7,6 +7,8 @@
 - [Admin - Pages Management](/adminpages): No description available
 - [Admin - Product Migration](/adminproductmigration): No description available
 - [Admin - SMS Settings](/adminsms): No description available
+- [Admin - გადახდების ისტორია](/adminpaymenthistory): No description available
+- [Admin - მიწოდების პარამეტრები](/admindelivery): No description available
 - [Category Attributes - Admin](/admincategoryattributes): No description available
 - [Handicraft — პრემიუმ ხელნაკეთი ნივთები და სათამაშოები](/home): Handicraft — უნიკალური, პრემიუმ ხარისხის ხელნაკეთი სათამაშოები და ბავშვის ნივთები. საძილე ტომარები, განმავითარებელი ხალიჩები, საწოლის ბამპერები. უფასო მიწოდება ₾150-ზე მეტ შეკვეთაზე.
 - [Loading Dots... - Handicraft](/dots): No description available
@@ -23,6 +25,7 @@
 - [ადმინ პანელი - შესვლა](/adminpanel): No description available
 - [ადმინ პანელი - შეტყობინებების ისტორია](/adminnotificationhistory): No description available
 - [ადმინ პანელი - შეტყობინებების პარამეტრები](/adminnotificationsettings): No description available
+- [გადახდის სტატუსი - Handicraft](/paymentbogresponse): No description available
 - [გადახდის სტატუსი - Handicraft](/paymentflittresponse): No description available
 - [კალათა - Handicraft](/cart): No description available
 - [შეკვეთა მიღებულია - Handicraft](/checkout): No description available

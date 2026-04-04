@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { 
   ShoppingBag, Users, DollarSign, TrendingUp, Bell, 
-  ArrowUpRight, ArrowDownRight, Package, 
+  ArrowUpRight, ArrowDownRight, Package, Eye, 
   ShoppingCart, Clock, CheckCircle, XCircle,
   Layers, FileText, Image, BarChart3, Activity,
   ChevronRight, ExternalLink, Zap, Star, Mail, Languages
@@ -11,32 +11,33 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useSimplePasswordAuth } from '@/context/SimplePasswordAuthContext';
 
-const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, gradient, to }) => {
-  const Wrapper = to ? Link : 'div';
-  const wrapperProps = to ? { to } : {};
-  return (
-  <Wrapper {...wrapperProps} className="group relative bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden cursor-pointer block">
-    {/* Subtle gradient backdrop */}
-    <div className={`absolute top-0 right-0 w-24 h-24 rounded-full ${gradient} opacity-[0.07] -mr-8 -mt-8 group-hover:opacity-[0.12] transition-opacity`} />
-    
-    <div className="relative">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shadow-sm`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        {trend && (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${
-            trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'
-          }`}>
-            {trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-            {trendValue}
+const StatCard = ({ title, value, icon: Icon, color, gradient, to }) => {
+  const content = (
+    <>
+      {/* Subtle gradient backdrop */}
+      <div className={`absolute top-0 right-0 w-24 h-24 rounded-full ${gradient} opacity-[0.07] -mr-8 -mt-8 group-hover:opacity-[0.12] transition-opacity`} />
+      
+      <div className="relative">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shadow-sm`}>
+            <Icon className="w-5 h-5 text-white" />
           </div>
-        )}
+          {to && (
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
+          )}
+        </div>
+        <p className="text-[13px] text-slate-500 mb-1 font-medium">{title}</p>
+        <p className="text-2xl font-bold text-slate-800 tracking-tight">{value}</p>
       </div>
-      <p className="text-[13px] text-slate-500 mb-1 font-medium">{title}</p>
-      <p className="text-2xl font-bold text-slate-800 tracking-tight">{value}</p>
-    </div>
-  </Wrapper>
+    </>
+  );
+
+  const className = "group relative bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden block";
+
+  return to ? (
+    <Link to={to} className={className}>{content}</Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 };
 
@@ -51,7 +52,7 @@ const QuickAction = ({ icon: Icon, label, to, color }) => (
 
 const AdminDashboard = () => {
   const { adminUser } = useSimplePasswordAuth();
-  const [stats, setStats] = useState({ products: 0, orders: 0, categories: 0, totalRevenue: 0 });
+  const [stats, setStats] = useState({ products: 0, orders: 0, categories: 0, revenue: 0 });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,25 +62,23 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [prodRes, orderRes, catRes, allOrdersRes] = await Promise.all([
+      const [prodRes, orderCountRes, recentOrderRes, catRes, revenueRes] = await Promise.all([
         supabase.from('products').select('id', { count: 'exact', head: true }),
+        supabase.from('orders').select('id', { count: 'exact', head: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5),
         supabase.from('categories').select('id', { count: 'exact', head: true }),
-        supabase.from('orders').select('id, total_amount, payment_status', { count: 'exact' }),
+        supabase.from('orders').select('total_amount').eq('payment_status', 'paid'),
       ]);
 
-      const allOrders = allOrdersRes.data || [];
-      const totalRevenue = allOrders
-        .filter(o => o.payment_status === 'paid')
-        .reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+      const totalRevenue = revenueRes.data?.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 0;
 
       setStats({
         products: prodRes.count || 0,
-        orders: allOrdersRes.count || 0,
+        orders: orderCountRes.count || 0,
         categories: catRes.count || 0,
-        totalRevenue,
+        revenue: totalRevenue,
       });
-      setRecentOrders(orderRes.data || []);
+      setRecentOrders(recentOrderRes.data || []);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -171,11 +170,11 @@ const AdminDashboard = () => {
         />
         <StatCard 
           title="შემოსავალი" 
-          value={loading ? '...' : `₾${stats.totalRevenue.toFixed(0)}`} 
+          value={loading ? '...' : `₾${stats.revenue.toFixed(0)}`} 
           icon={DollarSign} 
           color="bg-gradient-to-br from-emerald-500 to-emerald-600" 
           gradient="bg-emerald-400"
-          to="/admin/orders"
+          to="/admin/payment-history"
         />
       </div>
 
@@ -222,7 +221,7 @@ const AdminDashboard = () => {
                 const statusConfig = getStatusConfig(order.status);
                 const StatusIcon = statusConfig.icon;
                 return (
-                  <Link key={order.id || i} to="/admin/orders" className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
+                  <div key={order.id || i} className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500">
                         #{(order.id || i + 1).toString().slice(-3)}
@@ -241,7 +240,7 @@ const AdminDashboard = () => {
                         {statusConfig.label}
                       </span>
                     </div>
-                  </Link>
+                  </div>
                 );
               })
             )}
