@@ -83,6 +83,7 @@ const AdminLayout = () => {
       items: [
         { icon: Mail, label: 'მეილები', path: '/admin/newsletter' },
         { icon: MessageSquare, label: 'SMS', path: '/admin/sms' },
+        { icon: Mail, label: 'კონტაქტის შეტყობინებები', path: '/admin/contact-messages' },
       ]
     },
     {

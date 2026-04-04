@@ -180,8 +180,9 @@ const AdminSmsSettings = () => {
                 <input 
                   type="text" 
                   value={settings.provider_name}
-                  disabled
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed font-mono"
+                  onChange={(e) => setSettings(p => ({...p, provider_name: e.target.value}))}
+                  placeholder="smsoffice.ge"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#57c5cf]"
                 />
               </div>
 

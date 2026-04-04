@@ -13,6 +13,8 @@ const Contact = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [dotsCount, setDotsCount] = useState(4);
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,13 +39,31 @@ const Contact = () => {
     fetchDots();
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast({
-      title: "შეტყობინება გაგზავნილია! 💌",
-      description: "ჩვენ მალე დაგიკავშირდებით.",
-      className: "bg-[#57c5cf] text-white border-none"
-    });
+    if (!formData.name || !formData.email || !formData.message) return;
+    setSubmitting(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('submit-contact', {
+        body: formData
+      });
+      if (error) throw error;
+      toast({
+        title: "შეტყობინება გაგზავნილია! 💌",
+        description: "ჩვენ მალე დაგიკავშირდებით.",
+        className: "bg-[#57c5cf] text-white border-none"
+      });
+      setFormData({ name: '', email: '', message: '' });
+    } catch (err) {
+      console.error('Contact form error:', err);
+      toast({
+        variant: "destructive",
+        title: "შეცდომა",
+        description: "შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ თავიდან."
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const title = data?.[`title_${language}`] || 'კონტაქტი';
@@ -90,7 +110,9 @@ const Contact = () => {
                    <label className="block text-sm font-bold text-gray-700 mb-2 font-heading">{labels.name[language] || labels.name.ka}</label>
                    <input 
                      required
-                     type="text" 
+                     type="text"
+                     value={formData.name}
+                     onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#57c5cf] focus:outline-none transition-colors font-body bg-gray-50"
                    />
                  </div>
@@ -98,7 +120,9 @@ const Contact = () => {
                    <label className="block text-sm font-bold text-gray-700 mb-2 font-heading">{labels.email[language] || labels.email.ka}</label>
                    <input 
                      required
-                     type="email" 
+                     type="email"
+                     value={formData.email}
+                     onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#57c5cf] focus:outline-none transition-colors font-body bg-gray-50"
                    />
                  </div>
@@ -107,15 +131,18 @@ const Contact = () => {
                    <textarea 
                      required
                      rows="4"
+                     value={formData.message}
+                     onChange={e => setFormData(p => ({ ...p, message: e.target.value }))}
                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#57c5cf] focus:outline-none transition-colors font-body bg-gray-50"
                    ></textarea>
                  </div>
                  <Button 
                    type="submit"
+                   disabled={submitting}
                    className="w-full py-6 text-lg font-heading rounded-xl hover:shadow-lg transition-all"
                    style={{ backgroundColor: '#57c5cf' }}
                  >
-                   {labels.send[language] || labels.send.ka}
+                   {submitting ? 'იგზავნება...' : (labels.send[language] || labels.send.ka)}
                  </Button>
                </form>
             </div>

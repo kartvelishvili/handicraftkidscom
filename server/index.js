@@ -840,6 +840,27 @@ app.post('/functions/v1/bog-callback', async (req, res) => {
       for (const item of order.products) {
         if (item.id) await pool.query('SELECT decrement_stock($1, $2)', [item.id, item.quantity || 1]);
       }
+
+      // Send SMS/notification after successful payment
+      try {
+        const { rows: fullOrder } = await pool.query('SELECT * FROM orders WHERE id = $1', [order.id]);
+        if (fullOrder[0]) {
+          const orderObj = fullOrder[0];
+          // Parse customer_info if it's a string
+          if (typeof orderObj.customer_info === 'string') {
+            try { orderObj.customer_info = JSON.parse(orderObj.customer_info); } catch {}
+          }
+          // Fire notification via internal call
+          const notifUrl = `http://localhost:${PORT}/functions/v1/process-order-notification`;
+          fetch(notifUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderObj })
+          }).catch(e => console.error('BOG notification fetch error:', e));
+        }
+      } catch (notifErr) {
+        console.error('BOG post-payment notification error:', notifErr);
+      }
     }
 
     console.log(`BOG callback: order ${order.id} → ${paymentStatus}`);
@@ -1047,8 +1068,15 @@ app.post('/functions/v1/manage-admin-phones', async (req, res) => {
       );
       return res.json({ success: true, data: rows[0] });
     }
-    if (action === 'remove' && phone_id) {
-      await pool.query('DELETE FROM admin_phone_numbers WHERE id = $1', [phone_id]);
+    if ((action === 'remove' || action === 'delete') && (phone_id || req.body.id)) {
+      const targetId = phone_id || req.body.id;
+      await pool.query('DELETE FROM admin_phone_numbers WHERE id = $1', [targetId]);
+      return res.json({ success: true });
+    }
+    if (action === 'toggle' && (req.body.id || phone_id)) {
+      const targetId = req.body.id || phone_id;
+      const newState = req.body.is_active;
+      await pool.query('UPDATE admin_phone_numbers SET is_active = $1 WHERE id = $2', [newState, targetId]);
       return res.json({ success: true });
     }
     if (action === 'list') {
@@ -1057,6 +1085,21 @@ app.post('/functions/v1/manage-admin-phones', async (req, res) => {
     }
 
     res.status(400).json({ success: false, message: 'Invalid action' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Contact Messages ──
+app.post('/functions/v1/submit-contact', async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    if (!name || !email || !message) return res.status(400).json({ success: false, message: 'All fields required' });
+    const { rows } = await pool.query(
+      'INSERT INTO contact_messages (name, email, message) VALUES ($1, $2, $3) RETURNING *',
+      [name, email, message]
+    );
+    res.json({ success: true, data: rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
