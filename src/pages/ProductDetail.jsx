@@ -106,34 +106,36 @@ const ProductDetail = () => {
     if (product) trackViewItem(product);
   }, [product?.id]);
 
-  // Auto-select the cheapest option per priced attribute group
+  // Auto-select the cheapest option per selectable attribute group
   useEffect(() => {
-    if (productAttributes.length === 0) return;
+    if (productAttributes.length === 0 || !product) return;
+    const basePrice = Number(product.price) || 0;
     const attrGroups = {};
     productAttributes.forEach(pa => {
       if (!attrGroups[pa.attribute_name]) attrGroups[pa.attribute_name] = [];
       attrGroups[pa.attribute_name].push(pa);
     });
     
-    let firstPricedGroup = null;
+    let firstGroupItem = null;
     const autoSelections = {};
     Object.entries(attrGroups).forEach(([name, items]) => {
       const hasPrices = items.some(it => it.price != null && it.price > 0);
-      if (hasPrices && items.length >= 1) {
-        const sorted = [...items].sort((a, b) => (a.price || 0) - (b.price || 0));
+      if (items.length > 1 || hasPrices) {
+        const sorted = [...items].sort((a, b) => (a.price ?? basePrice) - (b.price ?? basePrice));
         autoSelections[name] = sorted[0].attribute_value;
-        if (!firstPricedGroup) firstPricedGroup = sorted[0];
+        if (!firstGroupItem) firstGroupItem = sorted[0];
       }
     });
     
     if (Object.keys(autoSelections).length > 0) {
       setSelectedOptions(autoSelections);
-      if (firstPricedGroup?.price != null) {
-        setSelectedAttrPrice(firstPricedGroup.price);
+      if (firstGroupItem) {
+        const effectivePrice = firstGroupItem.price ?? basePrice;
+        setSelectedAttrPrice(effectivePrice);
         setSelectedAttrName(Object.keys(autoSelections)[0]);
       }
     }
-  }, [productAttributes]);
+  }, [productAttributes, product?.id]);
 
   if (loading) return (
      <div className="min-h-screen flex items-center justify-center">
@@ -334,20 +336,20 @@ const ProductDetail = () => {
                    attrGroups[pa.attribute_name].push(pa);
                  });
                  
-                 // Separate: priced multi-option groups vs simple single-value attributes
-                 const pricedGroups = [];
+                 // Separate: multi-option groups (selectable) vs simple single-value attributes
+                 const selectableGroups = [];
                  const simpleAttrs = [];
                  
                  Object.entries(attrGroups).forEach(([name, items]) => {
                    const hasPrices = items.some(it => it.price != null && it.price > 0);
-                   if (hasPrices && items.length >= 1) {
-                     pricedGroups.push({ name, items });
+                   if (items.length > 1 || hasPrices) {
+                     selectableGroups.push({ name, items, hasPrices });
                    } else {
                      simpleAttrs.push(...items);
                    }
                  });
                  
-                 if (pricedGroups.length === 0 && simpleAttrs.length === 0) return null;
+                 if (selectableGroups.length === 0 && simpleAttrs.length === 0) return null;
                  
                  // Find matching category attribute for display name translation
                  const getCatAttr = (attrName) => categoryAttributes.find(ca => ca.attribute_name === attrName);
@@ -358,16 +360,17 @@ const ProductDetail = () => {
                         <Package className="w-4 h-4 text-[#57c5cf]" /> მახასიათებლები
                      </h3>
                      
-                     {/* Priced selectable options (sizes etc.) */}
-                     {pricedGroups.map(({ name, items }) => {
+                     {/* Selectable options (sizes etc.) */}
+                     {selectableGroups.map(({ name, items, hasPrices }) => {
                        const catAttr = getCatAttr(name);
                        let displayLabel = name;
                        if (language === 'en' && catAttr?.name_en) displayLabel = catAttr.name_en;
                        if (language === 'ru' && catAttr?.name_ru) displayLabel = catAttr.name_ru;
                        
                        const selectedOpt = selectedOptions[name];
-                       // Sort by price ascending
-                       const sorted = [...items].sort((a, b) => (a.price || 0) - (b.price || 0));
+                       // Sort by price ascending (null prices use base price for sorting)
+                       const basePrice = Number(product.price) || 0;
+                       const sorted = [...items].sort((a, b) => (a.price ?? basePrice) - (b.price ?? basePrice));
                        
                        return (
                          <div key={name} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
@@ -384,8 +387,9 @@ const ProductDetail = () => {
                                    type="button"
                                    onClick={() => {
                                      setSelectedOptions(prev => ({...prev, [name]: item.attribute_value}));
-                                     if (item.price != null) {
-                                       setSelectedAttrPrice(item.price);
+                                     const effectivePrice = item.price ?? Number(product.price);
+                                     if (effectivePrice != null) {
+                                       setSelectedAttrPrice(effectivePrice);
                                        setSelectedAttrName(name);
                                      }
                                    }}
@@ -397,12 +401,12 @@ const ProductDetail = () => {
                                    )}
                                  >
                                    <span>{item.attribute_value}</span>
-                                   {item.price != null && (
+                                   {hasPrices && (
                                      <span className={cn(
                                        "text-xs mt-0.5 font-bold",
                                        isSelected ? "text-white/90" : "text-[#f292bc]"
                                      )}>
-                                       ₾{item.price}
+                                       ₾{item.price ?? product.price}
                                      </span>
                                    )}
                                  </button>

@@ -46,6 +46,12 @@ const AdminProductEdit = () => {
   const [isSavingAttributes, setIsSavingAttributes] = useState(false);
   const [customOptionInputs, setCustomOptionInputs] = useState({});
 
+  // Standalone Sizes State (works without category attribute templates)
+  const [sizesEnabled, setSizesEnabled] = useState(false);
+  const [newSizeValue, setNewSizeValue] = useState('');
+  const [newSizePrice, setNewSizePrice] = useState('');
+  const SIZE_ATTR_NAME = 'ზომა';
+
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -101,14 +107,18 @@ const AdminProductEdit = () => {
           .eq('product_id', id);
           
         if (attrs) {
-          setProductAttributes(attrs.map(a => ({
+          const mapped = attrs.map(a => ({
             attribute_name: a.attribute_name,
             attribute_value: a.attribute_value,
             attribute_value_en: a.attribute_value_en,
             attribute_value_ru: a.attribute_value_ru,
             attribute_type: a.attribute_type,
             price: a.price || null
-          })));
+          }));
+          setProductAttributes(mapped);
+          // Auto-enable sizes section if product already has size entries with prices
+          const hasSizeEntries = mapped.some(a => a.price != null && a.price > 0);
+          if (hasSizeEntries) setSizesEnabled(true);
         }
       }
       setLoading(false);
@@ -255,8 +265,6 @@ const AdminProductEdit = () => {
   };
 
   const saveAttributes = async (productId) => {
-    if (!selectedCategoryId) return;
-
     console.log("Saving Attributes for Product:", productId);
     setIsSavingAttributes(true);
     try {
@@ -266,7 +274,7 @@ const AdminProductEdit = () => {
         .filter(pa => pa.attribute_value || pa.attribute_value_en || pa.attribute_value_ru)
         .map(pa => ({
            product_id: productId,
-           category_id: selectedCategoryId,
+           category_id: selectedCategoryId || null,
            attribute_name: pa.attribute_name,
            attribute_value: pa.attribute_value,
            attribute_value_en: pa.attribute_value_en,
@@ -465,6 +473,138 @@ const AdminProductEdit = () => {
               <div className="space-y-2">
                  <label className="text-sm font-bold text-gray-700">ფასი (₾)</label>
                  <input name="price" type="number" step="0.01" defaultValue={currentProduct?.price} className="w-full p-3 border rounded-xl bg-gray-50 focus:border-[#57c5cf] focus:outline-none font-mono text-lg" required placeholder="0.00" />
+              </div>
+
+              {/* Standalone Sizes / Variants Section */}
+              <div className="bg-gradient-to-br from-violet-50/50 to-pink-50/50 p-5 rounded-2xl border border-violet-100">
+                <label className="flex items-center gap-3 cursor-pointer select-none mb-1">
+                  <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${sizesEnabled ? 'bg-[#57c5cf]' : 'bg-gray-200'}`}>
+                    <input type="checkbox" checked={sizesEnabled} onChange={(e) => setSizesEnabled(e.target.checked)} className="sr-only" />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${sizesEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </div>
+                  <span className="font-bold text-gray-800 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-violet-500" /> ზომები / ვარიანტები
+                  </span>
+                </label>
+                <p className="text-xs text-gray-400 mb-3 ml-14">ჩართეთ თუ პროდუქტს რამდენიმე ზომა ან ვარიანტი აქვს</p>
+
+                {sizesEnabled && (() => {
+                  // Check if a category attribute already manages sizes with prices
+                  const hasCategoryPricedAttr = categoryAttributes.some(ca => {
+                    const opts = normalizeOptions(ca.options);
+                    return ['dropdown', 'checkbox'].includes(ca.attribute_type) && opts.some(o => o.price != null && o.price > 0);
+                  });
+
+                  // Get the attribute name to use: from category or default "ზომა"
+                  const sizeAttrName = hasCategoryPricedAttr 
+                    ? categoryAttributes.find(ca => {
+                        const opts = normalizeOptions(ca.options);
+                        return opts.some(o => o.price != null && o.price > 0);
+                      })?.attribute_name 
+                    : SIZE_ATTR_NAME;
+
+                  if (hasCategoryPricedAttr) {
+                    return (
+                      <div className="bg-white/70 rounded-xl p-3 border border-violet-100">
+                        <p className="text-sm text-violet-600 flex items-center gap-2">
+                          <Info className="w-4 h-4" />
+                          ზომები იმართება ქვემოთ, მახასიათებლებში (კატეგორიის შაბლონიდან)
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const sizeEntries = productAttributes.filter(pa => pa.attribute_name === sizeAttrName);
+                  
+                  const addSize = () => {
+                    if (!newSizeValue.trim()) return;
+                    const exists = productAttributes.find(p => p.attribute_name === sizeAttrName && p.attribute_value === newSizeValue.trim());
+                    if (exists) {
+                      toast({ title: "ეს ზომა უკვე დამატებულია", variant: "destructive" });
+                      return;
+                    }
+                    setProductAttributes(prev => [...prev, {
+                      attribute_name: sizeAttrName,
+                      attribute_type: 'checkbox',
+                      attribute_value: newSizeValue.trim(),
+                      attribute_value_en: '',
+                      attribute_value_ru: '',
+                      price: newSizePrice === '' ? null : Number(newSizePrice)
+                    }]);
+                    setNewSizeValue('');
+                    setNewSizePrice('');
+                  };
+                  
+                  return (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                      {/* Existing size entries */}
+                      {sizeEntries.length > 0 && (
+                        <div className="space-y-2">
+                          {sizeEntries.map((entry, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl border bg-white border-violet-100 shadow-sm">
+                              <span className="font-bold text-sm text-gray-900 flex-grow">{entry.attribute_value}</span>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <span className="text-xs text-gray-400">₾</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={entry.price ?? ''}
+                                  onChange={(e) => handleOptionPriceChange(sizeAttrName, entry.attribute_value, e.target.value)}
+                                  className="w-28 p-2 border rounded-lg text-sm font-mono text-right bg-white border-[#f292bc]/30 focus:border-[#f292bc] outline-none text-gray-900"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCustomOption(sizeAttrName, entry.attribute_value)}
+                                  className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {sizeEntries.length === 0 && (
+                        <div className="text-center py-4 bg-white/50 rounded-xl border border-dashed border-violet-200">
+                          <p className="text-sm text-gray-400">ჯერ ზომები არ არის დამატებული</p>
+                        </div>
+                      )}
+
+                      {/* Add new size */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="ზომა (მაგ: S, M, L, 100x120...)"
+                          value={newSizeValue}
+                          onChange={(e) => setNewSizeValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(); } }}
+                          className="flex-grow p-3 border rounded-xl text-sm bg-white focus:border-[#57c5cf] outline-none"
+                        />
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className="text-xs text-gray-400">₾</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="ფასი"
+                            value={newSizePrice}
+                            onChange={(e) => setNewSizePrice(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(); } }}
+                            className="w-28 p-3 border rounded-xl text-sm font-mono text-right bg-white focus:border-[#f292bc] outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addSize}
+                          className="p-3 bg-[#57c5cf] text-white rounded-xl hover:bg-[#4bc0cb] transition-colors flex-shrink-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-400">💡 ფასი ცარიელი რომ დატოვოთ, პროდუქტის ძირითადი ფასი გამოჩნდება. Enter-ით დამატებაც შეგიძლიათ.</p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Language Tabs */}
