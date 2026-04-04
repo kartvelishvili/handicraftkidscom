@@ -107,14 +107,23 @@ const AdminProductEdit = () => {
           .eq('product_id', id);
           
         if (attrs) {
-          const mapped = attrs.map(a => ({
-            attribute_name: a.attribute_name,
-            attribute_value: a.attribute_value,
-            attribute_value_en: a.attribute_value_en,
-            attribute_value_ru: a.attribute_value_ru,
-            attribute_type: a.attribute_type,
-            price: a.price || null
-          }));
+          // Deduplicate by (attribute_name, attribute_value) — keep first occurrence
+          const seen = new Set();
+          const mapped = attrs
+            .map(a => ({
+              attribute_name: a.attribute_name,
+              attribute_value: a.attribute_value,
+              attribute_value_en: a.attribute_value_en,
+              attribute_value_ru: a.attribute_value_ru,
+              attribute_type: a.attribute_type,
+              price: a.price || null
+            }))
+            .filter(a => {
+              const key = `${a.attribute_name}::${a.attribute_value}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
           setProductAttributes(mapped);
           // Auto-enable sizes section if product already has size entries with prices
           const hasSizeEntries = mapped.some(a => a.price != null && a.price > 0);
@@ -270,8 +279,16 @@ const AdminProductEdit = () => {
     try {
       await supabase.from('product_attributes').delete().eq('product_id', productId);
       
+      // Deduplicate by (attribute_name, attribute_value) before inserting
+      const seenKeys = new Set();
       const attributesToInsert = productAttributes
         .filter(pa => pa.attribute_value || pa.attribute_value_en || pa.attribute_value_ru)
+        .filter(pa => {
+          const key = `${pa.attribute_name}::${pa.attribute_value}`;
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        })
         .map(pa => ({
            product_id: productId,
            category_id: selectedCategoryId || null,
