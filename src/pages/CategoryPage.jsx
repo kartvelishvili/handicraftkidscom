@@ -412,18 +412,10 @@ const CategoryPage = () => {
                           
                           <div className="p-5 flex flex-col flex-grow">
                             <div className="mb-2">
-                               <h3 className="font-heading font-bold text-gray-800 text-lg group-hover:text-[#57c5cf] transition-colors line-clamp-1">
+                               <h3 className="font-heading font-bold text-gray-800 text-base group-hover:text-[#57c5cf] transition-colors line-clamp-3 leading-snug">
                                   {displayName}
                                </h3>
-                               
-                               {/* Attributes Display */}
-                               <div className="mt-2 h-6">
-                                  {product.product_attributes && product.product_attributes.length > 0 && (
-                                    <AttributeDisplay initialAttributes={product.product_attributes} compact language={language} />
-                                  )}
-                               </div>
                             </div>
-                            
                             <div className="mt-auto flex items-center justify-between">
                               <span className="text-xl font-heading font-bold" style={{ color: '#f292bc' }}>₾{product.price}</span>
                               <Button 
