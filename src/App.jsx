@@ -42,10 +42,13 @@ import AdminSmsSettings from '@/pages/AdminSmsSettings';
 import AdminDelivery from '@/pages/AdminDelivery';
 import AdminPaymentHistory from '@/pages/AdminPaymentHistory';
 import AdminContactMessages from '@/pages/AdminContactMessages';
+import AdminSeoSettings from '@/pages/AdminSeoSettings';
+import AdminFloatingButton from '@/pages/AdminFloatingButton';
 import AdminLayout from '@/components/AdminLayout';
 import AdminErrorBoundary from '@/components/AdminErrorBoundary';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import FloatingButton from '@/components/FloatingButton';
 
 import { CartProvider } from '@/context/CartContext';
 import { LanguageProvider } from '@/context/LanguageContext';
@@ -62,6 +65,7 @@ const LayoutWrapper = ({ children }) => {
         {children}
       </main>
       {!isAdmin && <Footer />}
+      {!isAdmin && <FloatingButton />}
     </>
   );
 };
@@ -141,6 +145,8 @@ function App() {
                     <Route path="delivery" element={<AdminDelivery />} />
                     <Route path="payment-history" element={<AdminPaymentHistory />} />
                     <Route path="contact-messages" element={<AdminContactMessages />} />
+                    <Route path="seo" element={<AdminSeoSettings />} />
+                    <Route path="floating-button" element={<AdminFloatingButton />} />
                   </Route>
                 </Routes>
                 </ErrorBoundary>

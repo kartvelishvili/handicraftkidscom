@@ -35,7 +35,8 @@ import {
   Megaphone,
   Cog,
   Truck,
-  Receipt
+  Receipt,
+  MousePointerClick
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -90,6 +91,8 @@ const AdminLayout = () => {
       label: 'პარამეტრები',
       items: [
         { icon: Truck, label: 'მიწოდება', path: '/admin/delivery' },
+        { icon: Search, label: 'SEO', path: '/admin/seo' },
+        { icon: MousePointerClick, label: 'მცურავი ღილაკი', path: '/admin/floating-button' },
         { icon: Settings, label: 'ფუტერი', path: '/admin/footer' },
         { icon: Languages, label: 'თარგმანები', path: '/admin/settings' },
         { icon: CreditCard, label: 'Flitt გადახდა', path: '/admin/flitt-settings' },

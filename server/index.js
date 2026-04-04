@@ -1265,6 +1265,95 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════
+// SPA SERVING + DYNAMIC OG META TAG INJECTION
+// ══════════════════════════════════════════════
+
+const DIST_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'dist');
+const INDEX_HTML_PATH = path.join(DIST_DIR, 'index.html');
+
+// Serve static assets from dist
+app.use(express.static(DIST_DIR, { index: false }));
+
+// Helper: detect social media crawlers
+function isCrawler(userAgent) {
+  if (!userAgent) return false;
+  const bots = /facebookexternalhit|Facebot|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Pinterest|Discordbot|Googlebot/i;
+  return bots.test(userAgent);
+}
+
+// Helper: escape HTML to prevent XSS in meta tags
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Product page OG injection for crawlers
+app.get('/product/:id', async (req, res) => {
+  try {
+    if (!isCrawler(req.headers['user-agent'])) {
+      // Normal user – serve SPA
+      if (fs.existsSync(INDEX_HTML_PATH)) {
+        return res.sendFile(INDEX_HTML_PATH);
+      }
+      return res.status(404).send('Not found');
+    }
+
+    // It's a crawler – inject product OG tags
+    const { id } = req.params;
+    const { rows } = await pool.query('SELECT name, description, image_url, price, meta_title, meta_description FROM products WHERE id = $1', [id]);
+    const product = rows[0];
+
+    if (!product || !fs.existsSync(INDEX_HTML_PATH)) {
+      if (fs.existsSync(INDEX_HTML_PATH)) return res.sendFile(INDEX_HTML_PATH);
+      return res.status(404).send('Not found');
+    }
+
+    let html = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
+    const siteUrl = process.env.SITE_URL || 'https://handicraft.com.ge';
+    const title = escapeHtml(product.meta_title || product.name || 'Handicraft');
+    const desc = escapeHtml(product.meta_description || (product.description || '').substring(0, 160));
+    const image = escapeHtml(product.image_url || '');
+    const url = `${siteUrl}/product/${id}`;
+    const price = product.price || '';
+
+    // Replace existing OG tags in index.html
+    html = html
+      .replace(/<title>[^<]*<\/title>/, `<title>${title} - Handicraft</title>`)
+      .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${desc}" />`)
+      .replace(/<meta property="og:type"[^>]*>/, `<meta property="og:type" content="product" />`)
+      .replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${title} - Handicraft" />`)
+      .replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${desc}" />`)
+      .replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${image}" />`)
+      .replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${url}" />`)
+      .replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${url}" />`);
+
+    // Add product price meta if not already present
+    if (price && !html.includes('product:price:amount')) {
+      html = html.replace('</head>', `<meta property="product:price:amount" content="${escapeHtml(String(price))}" />\n<meta property="product:price:currency" content="GEL" />\n</head>`);
+    }
+
+    res.set('Content-Type', 'text/html');
+    res.send(html);
+  } catch (err) {
+    console.error('OG injection error:', err);
+    if (fs.existsSync(INDEX_HTML_PATH)) return res.sendFile(INDEX_HTML_PATH);
+    res.status(500).send('Server error');
+  }
+});
+
+// Catch-all: serve SPA for all other non-API routes
+app.get('*', (req, res) => {
+  // Skip API-like paths
+  if (req.path.startsWith('/rest/') || req.path.startsWith('/auth/') || req.path.startsWith('/storage/') || req.path.startsWith('/functions/') || req.path.startsWith('/uploads/')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  if (fs.existsSync(INDEX_HTML_PATH)) {
+    return res.sendFile(INDEX_HTML_PATH);
+  }
+  res.status(404).send('Not found');
+});
+
 // ── Start server ──
 app.listen(PORT, () => {
   console.log(`\n  🚀 Backend API running on http://localhost:${PORT}`);

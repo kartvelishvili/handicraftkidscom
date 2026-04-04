@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Save, X, Image as ImageIcon, Trash2, Plus, Package, ArrowLeft, Layers, Check, Info, CheckCircle2 } from 'lucide-react';
+import { Save, X, Image as ImageIcon, Trash2, Plus, Package, ArrowLeft, Layers, Check, Info, CheckCircle2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -368,7 +368,12 @@ const AdminProductEdit = () => {
         description_en: formData.get('desc_en'),
         
         name_ru: formData.get('name_ru'),
-        description_ru: formData.get('desc_ru')
+        description_ru: formData.get('desc_ru'),
+        
+        // SEO fields
+        meta_title: formData.get('meta_title') || '',
+        meta_description: formData.get('meta_description') || '',
+        meta_keywords: formData.get('meta_keywords') || ''
       };
       
       let productId;
@@ -893,6 +898,28 @@ const AdminProductEdit = () => {
                      <input name="stock_quantity" type="number" defaultValue={currentProduct?.stock_quantity || 0} className="w-full p-3 border rounded-xl bg-white focus:border-[#57c5cf] focus:outline-none" />
                   </div>
                 )}
+              </div>
+
+              {/* SEO Section */}
+              <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/50 p-6 rounded-2xl border border-emerald-100">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                  <Search className="w-4 h-4 text-emerald-500" /> SEO პარამეტრები
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">SEO სათაური (Meta Title)</label>
+                    <input name="meta_title" defaultValue={currentProduct?.meta_title || ''} className="w-full p-3 border rounded-xl text-sm bg-white focus:border-emerald-400 focus:outline-none" placeholder="SEO სათაური (ცარიელი = პროდუქტის სახელი)" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">SEO აღწერა (Meta Description)</label>
+                    <textarea name="meta_description" defaultValue={currentProduct?.meta_description || ''} className="w-full p-3 border rounded-xl text-sm h-20 bg-white focus:border-emerald-400 focus:outline-none" placeholder="SEO აღწერა (ცარიელი = პროდუქტის აღწერა)" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">ქი ვორდები (Keywords)</label>
+                    <input name="meta_keywords" defaultValue={currentProduct?.meta_keywords || ''} className="w-full p-3 border rounded-xl text-sm bg-white focus:border-emerald-400 focus:outline-none" placeholder="keyword1, keyword2, keyword3" />
+                    <p className="text-[11px] text-gray-400">მძიმით გამოყოფილი საძიებო სიტყვები</p>
+                  </div>
+                </div>
               </div>
             </div>
 

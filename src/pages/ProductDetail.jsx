@@ -242,12 +242,13 @@ const ProductDetail = () => {
   return (
     <div className="min-h-screen bg-white pb-20 pt-8">
       <Helmet>
-        <title>{displayName} - Handicraft</title>
-        <meta name="description" content={displayDesc?.substring(0, 160) || `${displayName} — პრემიუმ ხარისხის ხელნაკეთი ნივთი Handicraft-ისგან.`} />
+        <title>{product?.meta_title || displayName} - Handicraft</title>
+        <meta name="description" content={product?.meta_description || displayDesc?.substring(0, 160) || `${displayName} — პრემიუმ ხარისხის ხელნაკეთი ნივთი Handicraft-ისგან.`} />
+        {product?.meta_keywords && <meta name="keywords" content={product.meta_keywords} />}
         <link rel="canonical" href={productUrl} />
         <meta property="og:type" content="product" />
-        <meta property="og:title" content={`${displayName} - Handicraft`} />
-        <meta property="og:description" content={displayDesc?.substring(0, 160) || ''} />
+        <meta property="og:title" content={`${product?.meta_title || displayName} - Handicraft`} />
+        <meta property="og:description" content={product?.meta_description || displayDesc?.substring(0, 160) || ''} />
         <meta property="og:image" content={productImage} />
         <meta property="og:url" content={productUrl} />
         <meta property="og:locale" content="ka_GE" />
