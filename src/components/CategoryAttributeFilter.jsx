@@ -55,7 +55,8 @@ const CategoryAttributeFilter = ({
                  {getAttributeName(attr)}
                </h3>
                <div className="flex flex-wrap gap-2">
-                 {Array.isArray(attr.options) ? attr.options.map((opt, idx) => {
+                 {Array.isArray(attr.options) ? attr.options.map((rawOpt, idx) => {
+                   const opt = typeof rawOpt === 'object' && rawOpt !== null ? rawOpt.value : rawOpt;
                    const isSelected = selectedAttributes[attr.attribute_name]?.includes(opt);
                    return (
                      <button

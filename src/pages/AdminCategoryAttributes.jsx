@@ -3,8 +3,18 @@ import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Trash2, Edit2, Save, X, List, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, List, AlertCircle, Loader2, GripVertical } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+const normalizeOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+  return options.map(opt => {
+    if (typeof opt === 'string') return { value: opt, price: null };
+    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
+    return { value: String(opt), price: null };
+  });
+};
 
 const AdminCategoryAttributes = () => {
   const { toast } = useToast();
@@ -30,7 +40,7 @@ const AdminCategoryAttributes = () => {
     attribute_type: 'dropdown',
     is_required: false,
     display_order: 1,
-    options: ''
+    options: [{ value: '', price: '' }]
   });
 
   useEffect(() => {
@@ -100,16 +110,16 @@ const AdminCategoryAttributes = () => {
     try {
       let parsedOptions = [];
       if (['dropdown', 'checkbox'].includes(formData.attribute_type)) {
-        try {
-          if (formData.options.trim().startsWith('[') && formData.options.trim().endsWith(']')) {
-             parsedOptions = JSON.parse(formData.options);
-          } else {
-             parsedOptions = formData.options.split(',').map(s => s.trim()).filter(Boolean);
-          }
-        } catch (err) {
+        parsedOptions = formData.options
+          .filter(opt => opt.value.trim() !== '')
+          .map(opt => ({
+            value: opt.value.trim(),
+            price: opt.price !== '' && opt.price !== null && opt.price !== undefined ? Number(opt.price) : null
+          }));
+        
+        if (parsedOptions.length === 0) {
           toast({ 
-            title: "არასწორი ფორმატი", 
-            description: "გთხოვთ გამოიყენოთ JSON ან მძიმით გამოყოფილი ტექსტი (მაგ: XS, S, M)", 
+            title: "გთხოვთ დაამატოთ ერთი ოფცია მაინც", 
             variant: "destructive" 
           });
           setOperationLoading(false);
@@ -189,6 +199,7 @@ const AdminCategoryAttributes = () => {
 
   const openEdit = (attr) => {
     setEditingAttribute(attr);
+    const normalized = normalizeOptions(attr.options);
     setFormData({
       attribute_name: attr.attribute_name || '',
       name_en: attr.name_en || '',
@@ -196,7 +207,9 @@ const AdminCategoryAttributes = () => {
       attribute_type: attr.attribute_type,
       is_required: attr.is_required,
       display_order: attr.display_order,
-      options: Array.isArray(attr.options) ? JSON.stringify(attr.options) : (attr.options || '')
+      options: normalized.length > 0 
+        ? normalized.map(o => ({ value: o.value, price: o.price ?? '' }))
+        : [{ value: '', price: '' }]
     });
     setIsModalOpen(true);
   };
@@ -210,7 +223,7 @@ const AdminCategoryAttributes = () => {
       attribute_type: 'dropdown',
       is_required: false,
       display_order: attributes.length + 1,
-      options: ''
+      options: [{ value: '', price: '' }]
     });
     setActiveTab('ka');
   };
@@ -313,8 +326,11 @@ const AdminCategoryAttributes = () => {
                             {(attr.attribute_type === 'dropdown' || attr.attribute_type === 'checkbox') ? (
                                <div className="flex flex-wrap gap-1">
                                   {Array.isArray(attr.options) ? (
-                                    attr.options.slice(0, 3).map((opt, i) => (
-                                      <span key={i} className="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-700">{opt}</span>
+                                    normalizeOptions(attr.options).slice(0, 3).map((opt, i) => (
+                                      <span key={i} className="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-700">
+                                        {opt.value}
+                                        {opt.price != null && <span className="ml-1 text-[#f292bc] font-bold">₾{opt.price}</span>}
+                                      </span>
                                     ))
                                   ) : attr.options}
                                   {Array.isArray(attr.options) && attr.options.length > 3 && (
@@ -453,15 +469,66 @@ const AdminCategoryAttributes = () => {
 
                 {['dropdown', 'checkbox'].includes(formData.attribute_type) && (
                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                      <label className="block text-sm font-bold text-gray-700 mb-1">ოფციები</label>
-                      <p className="text-xs text-gray-500 mb-2">გამოყავით მძიმით (მაგ: S, M, L)</p>
-                      <textarea 
-                        rows="3"
-                        value={formData.options}
-                        onChange={e => setFormData({...formData, options: e.target.value})}
-                        className="w-full p-3 border rounded-xl bg-white focus:border-[#57c5cf] focus:outline-none font-mono text-sm"
-                        placeholder='"XS", "S", "M"'
-                      />
+                      <div className="flex justify-between items-center mb-3">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700">ოფციები</label>
+                          <p className="text-xs text-gray-500 mt-0.5">თითოეულ ოფციას შეგიძლიათ მიუთითოთ ფასი</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, options: [...formData.options, { value: '', price: '' }]})}
+                          className="text-xs bg-[#57c5cf] text-white px-3 py-1.5 rounded-lg hover:bg-[#4bc0cb] font-bold flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> დამატება
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
+                          <span>მნიშვნელობა</span>
+                          <span>ფასი (₾)</span>
+                          <span></span>
+                        </div>
+                        {formData.options.map((opt, idx) => (
+                          <div key={idx} className="grid grid-cols-[1fr_100px_32px] gap-2 items-center">
+                            <input
+                              type="text"
+                              value={opt.value}
+                              onChange={e => {
+                                const newOpts = [...formData.options];
+                                newOpts[idx] = { ...newOpts[idx], value: e.target.value };
+                                setFormData({...formData, options: newOpts});
+                              }}
+                              className="p-2.5 border rounded-lg bg-white focus:border-[#57c5cf] focus:outline-none text-sm"
+                              placeholder={`ოფცია ${idx + 1}`}
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={opt.price}
+                              onChange={e => {
+                                const newOpts = [...formData.options];
+                                newOpts[idx] = { ...newOpts[idx], price: e.target.value };
+                                setFormData({...formData, options: newOpts});
+                              }}
+                              className="p-2.5 border rounded-lg bg-white focus:border-[#f292bc] focus:outline-none text-sm font-mono"
+                              placeholder="₾"
+                            />
+                            {formData.options.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newOpts = formData.options.filter((_, i) => i !== idx);
+                                  setFormData({...formData, options: newOpts});
+                                }}
+                                className="p-1.5 hover:bg-red-50 text-red-400 hover:text-red-500 rounded-lg transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                    </div>
                 )}
 

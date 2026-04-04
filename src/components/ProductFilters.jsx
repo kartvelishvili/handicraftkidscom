@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+const normalizeOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+  return options.map(opt => {
+    if (typeof opt === 'string') return { value: opt, price: null };
+    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
+    return { value: String(opt), price: null };
+  });
+};
+
 const ProductFilters = ({ 
   currentCategoryId, 
   onFilterChange, 
@@ -147,15 +157,16 @@ const ProductFilters = ({
                     
                     {(attr.attribute_type === 'dropdown' || attr.attribute_type === 'checkbox') && attr.options && (
                       <div className="flex flex-wrap gap-2">
-                        {attr.options.map((option) => {
+                        {normalizeOptions(attr.options).map((option) => {
+                          const optVal = option.value;
                           const isSelected = isMulti 
-                             ? (Array.isArray(currentVal) && currentVal.includes(option))
-                             : currentVal === option;
+                             ? (Array.isArray(currentVal) && currentVal.includes(optVal))
+                             : currentVal === optVal;
 
                           return (
                             <button
-                              key={option}
-                              onClick={() => handleAttributeChange(attr.attribute_name, option, attr.attribute_type)}
+                              key={optVal}
+                              onClick={() => handleAttributeChange(attr.attribute_name, optVal, attr.attribute_type)}
                               className={cn(
                                 "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border flex items-center gap-1.5",
                                 isSelected
@@ -164,7 +175,7 @@ const ProductFilters = ({
                               )}
                             >
                               {isSelected && <Check className="w-3 h-3" />}
-                              {option}
+                              {optVal}
                             </button>
                           );
                         })}

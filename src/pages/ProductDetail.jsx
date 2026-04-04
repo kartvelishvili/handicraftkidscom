@@ -11,6 +11,16 @@ import { cn } from '@/lib/utils';
 import AttributeDisplay from '@/components/AttributeDisplay';
 import { trackViewItem, trackAddToCart } from '@/utils/analytics';
 
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+const normalizeOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+  return options.map(opt => {
+    if (typeof opt === 'string') return { value: opt, price: null };
+    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
+    return { value: String(opt), price: null };
+  });
+};
+
 const ProductDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
@@ -19,12 +29,14 @@ const ProductDetail = () => {
   
   const [product, setProduct] = useState(null);
   const [productAttributes, setProductAttributes] = useState([]);
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [additionalImages, setAdditionalImages] = useState([]);
   const [selectedAttrName, setSelectedAttrName] = useState(null);
   const [selectedAttrPrice, setSelectedAttrPrice] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,6 +78,16 @@ const ProductDetail = () => {
           .select('*')
           .eq('product_id', id);
         if (attrs) setProductAttributes(attrs);
+
+        // Fetch Category Attributes (for selectable options with prices)
+        if (productData.category_id) {
+          const { data: catAttrs } = await supabase
+            .from('category_attributes')
+            .select('*')
+            .eq('category_id', productData.category_id)
+            .order('display_order');
+          if (catAttrs) setCategoryAttributes(catAttrs);
+        }
       } catch (error) {
         console.error("ProductDetail Fetch Error:", error);
         toast({ title: "პროდუქტი ვერ მოიძებნა", variant: "destructive" });
@@ -129,7 +151,7 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     if(!isOutOfStock) {
       const productWithPrice = selectedAttrPrice != null 
-        ? { ...product, price: selectedAttrPrice }
+        ? { ...product, price: selectedAttrPrice, selectedOptions }
         : product;
       addToCart(productWithPrice, quantity);
       trackAddToCart(productWithPrice, quantity);
@@ -263,25 +285,86 @@ const ProductDetail = () => {
                   </p>
                </div>
                
-               {/* Selected Attributes Section */}
-               {productAttributes.length > 0 && (
-                  <div className="mb-8 space-y-4">
+               {/* Selectable Attributes with Prices (from category_attributes) */}
+               {(() => {
+                 const pricedAttrs = categoryAttributes.filter(ca => {
+                   if (!['dropdown', 'checkbox'].includes(ca.attribute_type)) return false;
+                   const opts = normalizeOptions(ca.options);
+                   return opts.some(o => o.price != null && o.price > 0);
+                 });
+                 
+                 if (pricedAttrs.length === 0 && productAttributes.length === 0) return null;
+                 
+                 return (
+                   <div className="mb-8 space-y-4">
                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                         <Package className="w-4 h-4 text-[#57c5cf]" /> მახასიათებლები
                      </h3>
-                     <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                        <AttributeDisplay 
-                          initialAttributes={productAttributes} 
-                          language={language}
-                          onPriceSelect={(name, price) => {
-                            setSelectedAttrName(name);
-                            setSelectedAttrPrice(price);
-                          }}
-                          selectedAttrName={selectedAttrName}
-                        />
-                     </div>
-                  </div>
-               )}
+                     
+                     {/* Selectable options with prices */}
+                     {pricedAttrs.map(attr => {
+                       const opts = normalizeOptions(attr.options);
+                       const selectedOpt = selectedOptions[attr.attribute_name];
+                       
+                       let displayName = attr.attribute_name;
+                       if (language === 'en' && attr.name_en) displayName = attr.name_en;
+                       if (language === 'ru' && attr.name_ru) displayName = attr.name_ru;
+                       
+                       return (
+                         <div key={attr.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                           <label className="text-sm font-bold text-gray-700 mb-3 block">{displayName}</label>
+                           <div className="flex flex-wrap gap-2">
+                             {opts.map((opt, i) => {
+                               const isSelected = selectedOpt?.value === opt.value;
+                               return (
+                                 <button
+                                   key={i}
+                                   type="button"
+                                   onClick={() => {
+                                     setSelectedOptions(prev => ({...prev, [attr.attribute_name]: opt}));
+                                     if (opt.price != null) {
+                                       setSelectedAttrPrice(opt.price);
+                                       setSelectedAttrName(attr.attribute_name);
+                                     }
+                                   }}
+                                   className={cn(
+                                     "px-4 py-2.5 rounded-xl text-sm font-bold border-2 transition-all",
+                                     isSelected
+                                       ? "bg-[#57c5cf] text-white border-[#57c5cf] shadow-lg shadow-[#57c5cf]/20"
+                                       : "bg-white text-gray-700 border-gray-200 hover:border-[#57c5cf]/50 hover:bg-[#57c5cf]/5"
+                                   )}
+                                 >
+                                   {opt.value}
+                                   {opt.price != null && (
+                                     <span className={cn("ml-2 text-xs", isSelected ? "text-white/80" : "text-[#f292bc]")}>
+                                       ₾{opt.price}
+                                     </span>
+                                   )}
+                                 </button>
+                               );
+                             })}
+                           </div>
+                         </div>
+                       );
+                     })}
+
+                     {/* Static attributes (without prices or non-selectable) */}
+                     {productAttributes.length > 0 && (
+                       <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                          <AttributeDisplay 
+                            initialAttributes={productAttributes} 
+                            language={language}
+                            onPriceSelect={(name, price) => {
+                              setSelectedAttrName(name);
+                              setSelectedAttrPrice(price);
+                            }}
+                            selectedAttrName={selectedAttrName}
+                          />
+                       </div>
+                     )}
+                   </div>
+                 );
+               })()}
 
                <div className="mt-auto space-y-8">
                   <div className="flex flex-wrap items-end gap-6">

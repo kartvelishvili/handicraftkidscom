@@ -8,6 +8,16 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+const normalizeOptions = (options) => {
+  if (!Array.isArray(options)) return [];
+  return options.map(opt => {
+    if (typeof opt === 'string') return { value: opt, price: null };
+    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
+    return { value: String(opt), price: null };
+  });
+};
+
 const AdminProductEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -469,11 +479,9 @@ const AdminProductEdit = () => {
 
                     <div className="space-y-6">
                        {categoryAttributes.map(attr => {
-                          const isText = attr.attribute_type === 'text';
-                          const isDropdown = attr.attribute_type === 'dropdown'; // Treating dropdowns as text inputs for now if multi-lang needed, or standard selects
-                          // Simplification: treating all value inputs as text for multilingual support if they are free text.
-                          // If dropdown options are fixed in KA, they might need translation mapping. 
-                          // For now, assuming free text entry for values to support languages.
+                          const opts = normalizeOptions(attr.options);
+                          const hasOpts = ['dropdown', 'checkbox'].includes(attr.attribute_type) && opts.length > 0;
+                          const hasPricedOpts = opts.some(o => o.price != null && o.price > 0);
 
                           const currentAttr = productAttributes.find(pa => pa.attribute_name === attr.attribute_name);
                           let currentValue = '';
@@ -485,23 +493,52 @@ const AdminProductEdit = () => {
                             <div key={attr.id} className="space-y-2 bg-gray-50 p-4 rounded-xl border border-gray-100">
                                <label className="text-sm font-bold text-gray-700 flex gap-1 items-center mb-1">
                                   {attr.attribute_name}
+                                  {hasPricedOpts && <span className="text-[10px] text-[#f292bc] font-normal ml-1">(ფასით)</span>}
                                </label>
                                
                                <div className="flex gap-3">
-                                 <input 
-                                    type="text"
-                                    value={currentValue}
-                                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
-                                    className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
-                                    placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
-                                 />
+                                 {hasOpts && activeTab === 'ka' ? (
+                                   <select
+                                     value={currentValue}
+                                     onChange={(e) => {
+                                       const val = e.target.value;
+                                       handleAttributeChange(attr.attribute_name, val, attr.attribute_type, false, 'ka');
+                                       // Auto-fill price from category attribute options
+                                       if (hasPricedOpts) {
+                                         const selectedOpt = opts.find(o => o.value === val);
+                                         if (selectedOpt && selectedOpt.price != null) {
+                                           handleAttributePriceChange(attr.attribute_name, selectedOpt.price);
+                                         }
+                                       }
+                                     }}
+                                     className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none cursor-pointer"
+                                   >
+                                     <option value="">-- აირჩიეთ --</option>
+                                     {opts.map((opt, i) => (
+                                       <option key={i} value={opt.value}>
+                                         {opt.value}{opt.price != null ? ` (₾${opt.price})` : ''}
+                                       </option>
+                                     ))}
+                                   </select>
+                                 ) : (
+                                   <input 
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
+                                      className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
+                                      placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
+                                   />
+                                 )}
                                  <div className="w-32 flex-shrink-0">
                                    <input 
                                       type="number"
                                       step="0.01"
                                       value={currentAttr?.price ?? ''}
                                       onChange={(e) => handleAttributePriceChange(attr.attribute_name, e.target.value)}
-                                      className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#f292bc] outline-none font-mono"
+                                      className={cn(
+                                        "w-full p-3 border rounded-xl bg-white text-sm focus:border-[#f292bc] outline-none font-mono",
+                                        hasPricedOpts && "bg-pink-50/50"
+                                      )}
                                       placeholder="₾ ფასი"
                                    />
                                  </div>
