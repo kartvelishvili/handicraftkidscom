@@ -88,8 +88,27 @@ const Checkout = () => {
      }
   };
 
+  const validateForm = () => {
+    const { firstName, lastName, email, phone, city, address } = formData;
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim()) {
+      toast({ variant: 'destructive', title: 'შეავსეთ საკონტაქტო ინფორმაცია', description: 'სახელი, გვარი, ელ-ფოსტა და ტელეფონი სავალდებულოა.' });
+      return false;
+    }
+    if (deliverySettings.enabled && (!city.trim() || !address.trim())) {
+      toast({ variant: 'destructive', title: 'შეავსეთ მისამართი', description: 'ქალაქი და მისამართი სავალდებულოა.' });
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({ variant: 'destructive', title: 'არასწორი ელ-ფოსტა', description: 'გთხოვთ შეიყვანოთ სწორი ელ-ფოსტის მისამართი.' });
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
     setIsProcessing(true);
 
     try {
@@ -345,7 +364,7 @@ const Checkout = () => {
                </div>
             </div>
 
-            <Button onClick={handleSubmit} disabled={isProcessing} className="hidden lg:flex w-full py-6 text-lg font-heading rounded-full bg-[#57c5cf] hover:bg-[#4bc0cb] hover:shadow-lg transition-all">
+            <Button onClick={(e) => handleSubmit(e)} disabled={isProcessing} className="hidden lg:flex w-full py-6 text-lg font-heading rounded-full bg-[#57c5cf] hover:bg-[#4bc0cb] hover:shadow-lg transition-all">
                {isProcessing ? 'მუშავდება...' : 'შეკვეთის დასრულება'}
             </Button>
             

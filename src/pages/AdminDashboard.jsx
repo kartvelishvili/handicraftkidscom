@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { 
   ShoppingBag, Users, DollarSign, TrendingUp, Bell, 
-  ArrowUpRight, ArrowDownRight, Package, Eye, 
+  ArrowUpRight, ArrowDownRight, Package, 
   ShoppingCart, Clock, CheckCircle, XCircle,
   Layers, FileText, Image, BarChart3, Activity,
   ChevronRight, ExternalLink, Zap, Star, Mail, Languages
@@ -11,8 +11,11 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useSimplePasswordAuth } from '@/context/SimplePasswordAuthContext';
 
-const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, gradient }) => (
-  <div className="group relative bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
+const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, gradient, to }) => {
+  const Wrapper = to ? Link : 'div';
+  const wrapperProps = to ? { to } : {};
+  return (
+  <Wrapper {...wrapperProps} className="group relative bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden cursor-pointer block">
     {/* Subtle gradient backdrop */}
     <div className={`absolute top-0 right-0 w-24 h-24 rounded-full ${gradient} opacity-[0.07] -mr-8 -mt-8 group-hover:opacity-[0.12] transition-opacity`} />
     
@@ -33,8 +36,9 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, gradient
       <p className="text-[13px] text-slate-500 mb-1 font-medium">{title}</p>
       <p className="text-2xl font-bold text-slate-800 tracking-tight">{value}</p>
     </div>
-  </div>
-);
+  </Wrapper>
+  );
+};
 
 const QuickAction = ({ icon: Icon, label, to, color }) => (
   <Link to={to} className="group flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-white border border-slate-100 hover:shadow-md hover:shadow-slate-200/50 transition-all duration-300 hover:-translate-y-0.5">
@@ -47,7 +51,7 @@ const QuickAction = ({ icon: Icon, label, to, color }) => (
 
 const AdminDashboard = () => {
   const { adminUser } = useSimplePasswordAuth();
-  const [stats, setStats] = useState({ products: 0, orders: 0, categories: 0 });
+  const [stats, setStats] = useState({ products: 0, orders: 0, categories: 0, totalRevenue: 0 });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,16 +61,23 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [prodRes, orderRes, catRes] = await Promise.all([
+      const [prodRes, orderRes, catRes, allOrdersRes] = await Promise.all([
         supabase.from('products').select('id', { count: 'exact', head: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5),
         supabase.from('categories').select('id', { count: 'exact', head: true }),
+        supabase.from('orders').select('id, total_amount, payment_status', { count: 'exact' }),
       ]);
+
+      const allOrders = allOrdersRes.data || [];
+      const totalRevenue = allOrders
+        .filter(o => o.payment_status === 'paid')
+        .reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
 
       setStats({
         products: prodRes.count || 0,
-        orders: orderRes.data?.length || 0,
+        orders: allOrdersRes.count || 0,
         categories: catRes.count || 0,
+        totalRevenue,
       });
       setRecentOrders(orderRes.data || []);
     } catch (err) {
@@ -140,8 +151,7 @@ const AdminDashboard = () => {
           icon={Package} 
           color="bg-gradient-to-br from-cyan-500 to-cyan-600" 
           gradient="bg-cyan-400"
-          trend="up" 
-          trendValue="+12%" 
+          to="/admin/products"
         />
         <StatCard 
           title="შეკვეთები" 
@@ -149,8 +159,7 @@ const AdminDashboard = () => {
           icon={ShoppingCart} 
           color="bg-gradient-to-br from-violet-500 to-violet-600" 
           gradient="bg-violet-400"
-          trend="up" 
-          trendValue="+8%" 
+          to="/admin/orders"
         />
         <StatCard 
           title="კატეგორიები" 
@@ -158,13 +167,15 @@ const AdminDashboard = () => {
           icon={Layers} 
           color="bg-gradient-to-br from-amber-500 to-orange-500" 
           gradient="bg-amber-400"
+          to="/admin/categories"
         />
         <StatCard 
-          title="ვიზიტორები დღეს" 
-          value="—" 
-          icon={Eye} 
+          title="შემოსავალი" 
+          value={loading ? '...' : `₾${stats.totalRevenue.toFixed(0)}`} 
+          icon={DollarSign} 
           color="bg-gradient-to-br from-emerald-500 to-emerald-600" 
           gradient="bg-emerald-400"
+          to="/admin/orders"
         />
       </div>
 
@@ -211,26 +222,26 @@ const AdminDashboard = () => {
                 const statusConfig = getStatusConfig(order.status);
                 const StatusIcon = statusConfig.icon;
                 return (
-                  <div key={order.id || i} className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
+                  <Link key={order.id || i} to="/admin/orders" className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500">
                         #{(order.id || i + 1).toString().slice(-3)}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-700">{order.customer_name || order.full_name || 'მომხმარებელი'}</p>
+                        <p className="text-sm font-semibold text-slate-700">{order.customer_info ? `${order.customer_info.firstName || ''} ${order.customer_info.lastName || ''}`.trim() || 'მომხმარებელი' : 'მომხმარებელი'}</p>
                         <p className="text-xs text-slate-400">{formatDate(order.created_at)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-slate-700">
-                        {order.total ? `₾${parseFloat(order.total).toFixed(0)}` : '—'}
+                        {order.total_amount ? `₾${parseFloat(order.total_amount).toFixed(0)}` : '—'}
                       </span>
                       <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border ${statusConfig.cls}`}>
                         <StatusIcon className="w-3 h-3" />
                         {statusConfig.label}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             )}

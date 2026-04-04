@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/customSupabaseClient';
 import { sendOrderNotificationsViaEdgeFunction } from '@/services/orderNotificationService';
 import { trackPurchase } from '@/utils/analytics';
+import { useCart } from '@/context/CartContext';
 
 const PaymentBogResponse = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { clearCart } = useCart();
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('გადახდის სტატუსი მოწმდება...');
 
@@ -56,7 +58,7 @@ const PaymentBogResponse = () => {
             trackPurchase(orderId, order.products, order.total_amount);
           }
 
-          localStorage.removeItem('cartItems');
+          clearCart();
 
           if (!order.sms_sent_to_admin || !order.sms_sent_to_customer || !order.email_sent_to_customer) {
              try {

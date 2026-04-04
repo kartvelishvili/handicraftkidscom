@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/customSupabaseClient';
 import { sendOrderNotificationsViaEdgeFunction } from '@/services/orderNotificationService';
 import { trackPurchase } from '@/utils/analytics';
+import { useCart } from '@/context/CartContext';
 
 const PaymentFlittResponse = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { clearCart } = useCart();
   const [status, setStatus] = useState('loading'); // loading, success, failed
   const [message, setMessage] = useState('გადახდის სტატუსი მოწმდება...');
 
@@ -59,7 +61,7 @@ const PaymentFlittResponse = () => {
           }
 
           // Clear cart
-          localStorage.removeItem('cartItems');
+          clearCart();
 
           // Send all notifications if not already processed
           if (!order.sms_sent_to_admin || !order.sms_sent_to_customer || !order.email_sent_to_customer) {
