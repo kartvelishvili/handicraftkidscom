@@ -11,13 +11,18 @@ import { cn } from '@/lib/utils';
 import AttributeDisplay from '@/components/AttributeDisplay';
 import { trackViewItem, trackAddToCart } from '@/utils/analytics';
 
-// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85,value_en,value_ru}])
 const normalizeOptions = (options) => {
   if (!Array.isArray(options)) return [];
   return options.map(opt => {
-    if (typeof opt === 'string') return { value: opt, price: null };
-    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
-    return { value: String(opt), price: null };
+    if (typeof opt === 'string') return { value: opt, price: null, value_en: null, value_ru: null };
+    if (typeof opt === 'object' && opt !== null) return { 
+      value: opt.value || '', 
+      price: opt.price ?? null,
+      value_en: opt.value_en || null,
+      value_ru: opt.value_ru || null
+    };
+    return { value: String(opt), price: null, value_en: null, value_ru: null };
   });
 };
 
@@ -106,12 +111,38 @@ const ProductDetail = () => {
     if (product) trackViewItem(product);
   }, [product?.id]);
 
+  // Build merged attributes: product_attributes + category_attributes options for missing groups
+  const mergedAttributes = React.useMemo(() => {
+    if (!product) return [];
+    // Start with product-specific attributes
+    const result = [...productAttributes];
+    const existingNames = new Set(productAttributes.map(pa => pa.attribute_name));
+    
+    // Add category attribute options for groups not already in product_attributes
+    categoryAttributes.forEach(ca => {
+      if (existingNames.has(ca.attribute_name)) return;
+      if (!['dropdown', 'checkbox'].includes(ca.attribute_type)) return;
+      const opts = normalizeOptions(ca.options);
+      if (opts.length === 0) return;
+      opts.forEach(opt => {
+        result.push({
+          attribute_name: ca.attribute_name,
+          attribute_value: opt.value,
+          price: opt.price,
+          _fromCategory: true,
+          _opt: opt // keep full option for translations
+        });
+      });
+    });
+    return result;
+  }, [productAttributes, categoryAttributes, product?.id]);
+
   // Auto-select the cheapest option per selectable attribute group
   useEffect(() => {
-    if (productAttributes.length === 0 || !product) return;
+    if (mergedAttributes.length === 0 || !product) return;
     const basePrice = Number(product.price) || 0;
     const attrGroups = {};
-    productAttributes.forEach(pa => {
+    mergedAttributes.forEach(pa => {
       if (!attrGroups[pa.attribute_name]) attrGroups[pa.attribute_name] = [];
       attrGroups[pa.attribute_name].push(pa);
     });
@@ -135,7 +166,7 @@ const ProductDetail = () => {
         setSelectedAttrName(Object.keys(autoSelections)[0]);
       }
     }
-  }, [productAttributes, product?.id]);
+  }, [mergedAttributes, product?.id]);
 
   if (loading) return (
      <div className="min-h-screen flex items-center justify-center">
@@ -329,9 +360,9 @@ const ProductDetail = () => {
                
                {/* Selectable Attributes with Prices */}
                {(() => {
-                 // Group product_attributes by attribute_name to find multi-option attributes
+                 // Group mergedAttributes by attribute_name to find multi-option attributes
                  const attrGroups = {};
-                 productAttributes.forEach(pa => {
+                 mergedAttributes.forEach(pa => {
                    if (!attrGroups[pa.attribute_name]) attrGroups[pa.attribute_name] = [];
                    attrGroups[pa.attribute_name].push(pa);
                  });
@@ -381,6 +412,21 @@ const ProductDetail = () => {
                            <div className="flex flex-wrap gap-2">
                              {sorted.map((item, i) => {
                                const isSelected = selectedOpt === item.attribute_value;
+                               // Get translated option display value
+                               let optDisplayValue = item.attribute_value;
+                               if (item._opt) {
+                                 // From category attributes - has direct translations
+                                 if (language === 'en' && item._opt.value_en) optDisplayValue = item._opt.value_en;
+                                 else if (language === 'ru' && item._opt.value_ru) optDisplayValue = item._opt.value_ru;
+                               } else if (catAttr) {
+                                 // From product_attributes - look up translation in category attribute options
+                                 const catOpts = normalizeOptions(catAttr.options);
+                                 const matchOpt = catOpts.find(o => o.value === item.attribute_value);
+                                 if (matchOpt) {
+                                   if (language === 'en' && matchOpt.value_en) optDisplayValue = matchOpt.value_en;
+                                   else if (language === 'ru' && matchOpt.value_ru) optDisplayValue = matchOpt.value_ru;
+                                 }
+                               }
                                return (
                                  <button
                                    key={i}
@@ -400,7 +446,7 @@ const ProductDetail = () => {
                                        : "bg-white text-gray-700 border-gray-200 hover:border-[#57c5cf]/50 hover:bg-[#57c5cf]/5 hover:shadow-sm"
                                    )}
                                  >
-                                   <span>{item.attribute_value}</span>
+                                   <span>{optDisplayValue}</span>
                                    {hasPrices && (
                                      <span className={cn(
                                        "text-xs mt-0.5 font-bold",

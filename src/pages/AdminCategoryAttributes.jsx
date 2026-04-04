@@ -6,13 +6,18 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus, Trash2, Edit2, Save, X, List, AlertCircle, Loader2, GripVertical } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
-// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85}])
+// Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85,value_en,value_ru}])
 const normalizeOptions = (options) => {
   if (!Array.isArray(options)) return [];
   return options.map(opt => {
-    if (typeof opt === 'string') return { value: opt, price: null };
-    if (typeof opt === 'object' && opt !== null) return { value: opt.value || '', price: opt.price ?? null };
-    return { value: String(opt), price: null };
+    if (typeof opt === 'string') return { value: opt, price: null, value_en: '', value_ru: '' };
+    if (typeof opt === 'object' && opt !== null) return { 
+      value: opt.value || '', 
+      price: opt.price ?? null,
+      value_en: opt.value_en || '',
+      value_ru: opt.value_ru || ''
+    };
+    return { value: String(opt), price: null, value_en: '', value_ru: '' };
   });
 };
 
@@ -40,7 +45,7 @@ const AdminCategoryAttributes = () => {
     attribute_type: 'dropdown',
     is_required: false,
     display_order: 1,
-    options: [{ value: '', price: '' }]
+    options: [{ value: '', price: '', value_en: '', value_ru: '' }]
   });
 
   useEffect(() => {
@@ -114,7 +119,9 @@ const AdminCategoryAttributes = () => {
           .filter(opt => opt.value.trim() !== '')
           .map(opt => ({
             value: opt.value.trim(),
-            price: opt.price !== '' && opt.price !== null && opt.price !== undefined ? Number(opt.price) : null
+            price: opt.price !== '' && opt.price !== null && opt.price !== undefined ? Number(opt.price) : null,
+            value_en: opt.value_en?.trim() || null,
+            value_ru: opt.value_ru?.trim() || null
           }));
         
         if (parsedOptions.length === 0) {
@@ -208,8 +215,8 @@ const AdminCategoryAttributes = () => {
       is_required: attr.is_required,
       display_order: attr.display_order,
       options: normalized.length > 0 
-        ? normalized.map(o => ({ value: o.value, price: o.price ?? '' }))
-        : [{ value: '', price: '' }]
+        ? normalized.map(o => ({ value: o.value, price: o.price ?? '', value_en: o.value_en || '', value_ru: o.value_ru || '' }))
+        : [{ value: '', price: '', value_en: '', value_ru: '' }]
     });
     setIsModalOpen(true);
   };
@@ -223,7 +230,7 @@ const AdminCategoryAttributes = () => {
       attribute_type: 'dropdown',
       is_required: false,
       display_order: attributes.length + 1,
-      options: [{ value: '', price: '' }]
+      options: [{ value: '', price: '', value_en: '', value_ru: '' }]
     });
     setActiveTab('ka');
   };
@@ -329,6 +336,11 @@ const AdminCategoryAttributes = () => {
                                     normalizeOptions(attr.options).slice(0, 3).map((opt, i) => (
                                       <span key={i} className="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-700">
                                         {opt.value}
+                                        {(opt.value_en || opt.value_ru) && (
+                                          <span className="text-gray-400 ml-0.5 text-[10px]">
+                                            {opt.value_en && `EN`}{opt.value_en && opt.value_ru && '/'}{opt.value_ru && `RU`}
+                                          </span>
+                                        )}
                                         {opt.price != null && <span className="ml-1 text-[#f292bc] font-bold">₾{opt.price}</span>}
                                       </span>
                                     ))
@@ -476,7 +488,7 @@ const AdminCategoryAttributes = () => {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setFormData({...formData, options: [...formData.options, { value: '', price: '' }]})}
+                          onClick={() => setFormData({...formData, options: [...formData.options, { value: '', price: '', value_en: '', value_ru: '' }]})}
                           className="text-xs bg-[#57c5cf] text-white px-3 py-1.5 rounded-lg hover:bg-[#4bc0cb] font-bold flex items-center gap-1"
                         >
                           <Plus className="w-3 h-3" /> დამატება
@@ -484,48 +496,70 @@ const AdminCategoryAttributes = () => {
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="grid grid-cols-[1fr_100px_32px] gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
-                          <span>მნიშვნელობა</span>
-                          <span>ფასი (₾)</span>
-                          <span></span>
-                        </div>
                         {formData.options.map((opt, idx) => (
-                          <div key={idx} className="grid grid-cols-[1fr_100px_32px] gap-2 items-center">
-                            <input
-                              type="text"
-                              value={opt.value}
-                              onChange={e => {
-                                const newOpts = [...formData.options];
-                                newOpts[idx] = { ...newOpts[idx], value: e.target.value };
-                                setFormData({...formData, options: newOpts});
-                              }}
-                              className="p-2.5 border rounded-lg bg-white focus:border-[#57c5cf] focus:outline-none text-sm"
-                              placeholder={`ოფცია ${idx + 1}`}
-                            />
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={opt.price}
-                              onChange={e => {
-                                const newOpts = [...formData.options];
-                                newOpts[idx] = { ...newOpts[idx], price: e.target.value };
-                                setFormData({...formData, options: newOpts});
-                              }}
-                              className="p-2.5 border rounded-lg bg-white focus:border-[#f292bc] focus:outline-none text-sm font-mono"
-                              placeholder="₾"
-                            />
-                            {formData.options.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newOpts = formData.options.filter((_, i) => i !== idx);
+                          <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-gray-400 w-5">#{idx+1}</span>
+                              <input
+                                type="text"
+                                value={opt.value}
+                                onChange={e => {
+                                  const newOpts = [...formData.options];
+                                  newOpts[idx] = { ...newOpts[idx], value: e.target.value };
                                   setFormData({...formData, options: newOpts});
                                 }}
-                                className="p-1.5 hover:bg-red-50 text-red-400 hover:text-red-500 rounded-lg transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
+                                className="flex-1 p-2 border rounded-lg bg-gray-50 focus:border-[#57c5cf] focus:outline-none text-sm"
+                                placeholder="მნიშვნელობა (KA)"
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={opt.price}
+                                onChange={e => {
+                                  const newOpts = [...formData.options];
+                                  newOpts[idx] = { ...newOpts[idx], price: e.target.value };
+                                  setFormData({...formData, options: newOpts});
+                                }}
+                                className="w-[90px] p-2 border rounded-lg bg-gray-50 focus:border-[#f292bc] focus:outline-none text-sm font-mono"
+                                placeholder="₾"
+                              />
+                              {formData.options.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newOpts = formData.options.filter((_, i) => i !== idx);
+                                    setFormData({...formData, options: newOpts});
+                                  }}
+                                  className="p-1.5 hover:bg-red-50 text-red-400 hover:text-red-500 rounded-lg transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex gap-2 pl-5">
+                              <input
+                                type="text"
+                                value={opt.value_en}
+                                onChange={e => {
+                                  const newOpts = [...formData.options];
+                                  newOpts[idx] = { ...newOpts[idx], value_en: e.target.value };
+                                  setFormData({...formData, options: newOpts});
+                                }}
+                                className="flex-1 p-1.5 border rounded-lg bg-gray-50 focus:border-[#57c5cf] focus:outline-none text-xs"
+                                placeholder="EN 🇺🇸"
+                              />
+                              <input
+                                type="text"
+                                value={opt.value_ru}
+                                onChange={e => {
+                                  const newOpts = [...formData.options];
+                                  newOpts[idx] = { ...newOpts[idx], value_ru: e.target.value };
+                                  setFormData({...formData, options: newOpts});
+                                }}
+                                className="flex-1 p-1.5 border rounded-lg bg-gray-50 focus:border-[#57c5cf] focus:outline-none text-xs"
+                                placeholder="RU 🇷🇺"
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>
