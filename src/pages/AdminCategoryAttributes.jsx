@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Trash2, Edit2, Save, X, List, AlertCircle, Loader2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, List, AlertCircle, Loader2, GripVertical, Pencil, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 // Normalize options: support both old format (["S","M"]) and new format ([{value:"S",price:85,value_en,value_ru}])
@@ -36,6 +36,10 @@ const AdminCategoryAttributes = () => {
   
   // Language tab state for modal
   const [activeTab, setActiveTab] = useState('ka');
+  
+  // Category name editing state
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [catNameForm, setCatNameForm] = useState({ name: '', name_en: '', name_ru: '' });
 
   // Form State
   const [formData, setFormData] = useState({
@@ -235,6 +239,39 @@ const AdminCategoryAttributes = () => {
     setActiveTab('ka');
   };
 
+  const startEditCatName = (cat) => {
+    const transKey = `cat_${cat.slug}`;
+    setCatNameForm({
+      name: cat.name,
+      name_en: translations[transKey]?.en || '',
+      name_ru: translations[transKey]?.ru || ''
+    });
+    setEditingCatId(cat.id);
+  };
+
+  const saveCatName = async (cat) => {
+    try {
+      // Update category name
+      await supabase.from('categories').update({ name: catNameForm.name }).eq('id', cat.id);
+      // Save translations
+      await supabase.from('translations').upsert({
+        key: `cat_${cat.slug}`,
+        ka: catNameForm.name,
+        en: catNameForm.name_en,
+        ru: catNameForm.name_ru
+      }, { onConflict: 'key' });
+      
+      setEditingCatId(null);
+      fetchCategories();
+      if (selectedCategory?.id === cat.id) {
+        setSelectedCategory({ ...cat, name: catNameForm.name });
+      }
+      toast({ title: "კატეგორიის სახელი განახლდა", className: "bg-[#57c5cf] text-white" });
+    } catch (error) {
+      toast({ title: "შეცდომა", description: error.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <Helmet><title>Category Attributes - Admin</title></Helmet>
@@ -252,13 +289,51 @@ const AdminCategoryAttributes = () => {
           </div>
           <div className="divide-y divide-gray-100 max-h-[70vh] overflow-y-auto">
             {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat)}
-                className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors ${selectedCategory?.id === cat.id ? 'bg-[#57c5cf]/10 text-[#57c5cf] border-r-4 border-[#57c5cf]' : 'text-gray-600'}`}
-              >
-                {cat.name}
-              </button>
+              <div key={cat.id}>
+                {editingCatId === cat.id ? (
+                  <div className="p-3 bg-blue-50 border-r-4 border-blue-400 space-y-2">
+                    <div className="flex items-center gap-1">
+                      <input
+                        value={catNameForm.name}
+                        onChange={e => setCatNameForm(p => ({ ...p, name: e.target.value }))}
+                        className="flex-1 p-1.5 border rounded-lg text-sm bg-white focus:border-[#57c5cf] focus:outline-none"
+                        placeholder="სახელი (KA)"
+                        autoFocus
+                      />
+                      <button onClick={() => saveCatName(cat)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"><Check className="w-4 h-4" /></button>
+                      <button onClick={() => setEditingCatId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="w-4 h-4" /></button>
+                    </div>
+                    <input
+                      value={catNameForm.name_en}
+                      onChange={e => setCatNameForm(p => ({ ...p, name_en: e.target.value }))}
+                      className="w-full p-1.5 border rounded-lg text-xs bg-white focus:border-[#57c5cf] focus:outline-none"
+                      placeholder="Name (EN) 🇺🇸"
+                    />
+                    <input
+                      value={catNameForm.name_ru}
+                      onChange={e => setCatNameForm(p => ({ ...p, name_ru: e.target.value }))}
+                      className="w-full p-1.5 border rounded-lg text-xs bg-white focus:border-[#57c5cf] focus:outline-none"
+                      placeholder="Название (RU) 🇷🇺"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center group">
+                    <button
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`flex-1 text-left px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors ${selectedCategory?.id === cat.id ? 'bg-[#57c5cf]/10 text-[#57c5cf]' : 'text-gray-600'}`}
+                    >
+                      {cat.name}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); startEditCatName(cat); }}
+                      className="p-2 mr-1 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      title="სახელის რედაქტირება"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
             {!loading && categories.length === 0 && (
                <div className="p-4 text-sm text-gray-400 text-center">კატეგორიები ვერ მოიძებნა</div>

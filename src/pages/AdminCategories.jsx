@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { Plus, Trash2, Edit2, GripVertical, Save, X, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, GripVertical, Save, X, RefreshCw, CheckCircle2, Upload, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -12,8 +12,24 @@ const AdminCategories = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentCategory, setCurrentCategory] = useState(null);
+  const [iconFile, setIconFile] = useState(null);
+  const [iconPreview, setIconPreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const iconInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const { toast } = useToast();
   const { translations } = useLanguage();
+
+  const uploadCategoryFile = async (file, folder) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+    const { error } = await supabase.storage.from('categories').upload(fileName, file);
+    if (error) throw error;
+    const { data } = supabase.storage.from('categories').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
 
   useEffect(() => {
     fetchData();
@@ -56,17 +72,31 @@ const AdminCategories = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     const formData = new FormData(e.target);
-    const categoryData = {
-      name: formData.get('name'),
-      slug: formData.get('slug'),
-      color: formData.get('color'),
-      icon_url: formData.get('icon_url'),
-      is_active: formData.get('is_active') === 'on',
-      admin_id: parseInt(formData.get('admin_id') || '0'),
-    };
     
     try {
+      // Upload icon if new file selected
+      let iconUrl = formData.get('icon_url');
+      if (iconFile) {
+        iconUrl = await uploadCategoryFile(iconFile, 'icons');
+      }
+      
+      // Upload image if new file selected
+      let imageUrl = currentCategory?.image_url || '';
+      if (imageFile) {
+        imageUrl = await uploadCategoryFile(imageFile, 'images');
+      }
+    
+      const categoryData = {
+        name: formData.get('name'),
+        slug: formData.get('slug'),
+        color: formData.get('color'),
+        icon_url: iconUrl,
+        image_url: imageUrl,
+        is_active: formData.get('is_active') === 'on',
+        admin_id: parseInt(formData.get('admin_id') || '0'),
+      };
       console.log("Saving Category Data:", categoryData);
       let catId;
       if (currentCategory) {
@@ -100,10 +130,16 @@ const AdminCategories = () => {
       await fetchData(); // Await fetch to ensure UI update
       setIsEditing(false);
       setCurrentCategory(null);
+      setIconFile(null);
+      setIconPreview(null);
+      setImageFile(null);
+      setImagePreview(null);
       toast({ title: "შენახულია" });
     } catch (error) {
       console.error("Save Error:", error);
       toast({ title: "შეცდომა", variant: "destructive", description: error.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -155,6 +191,10 @@ const AdminCategories = () => {
 
   const openEdit = (category) => {
     setCurrentCategory(category);
+    setIconFile(null);
+    setIconPreview(category?.icon_url || null);
+    setImageFile(null);
+    setImagePreview(category?.image_url || null);
     setIsEditing(true);
   };
 
@@ -179,8 +219,40 @@ const AdminCategories = () => {
           
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
-               <label className="text-sm font-bold text-gray-700">Icon URL</label>
-               <input name="icon_url" defaultValue={currentCategory?.icon_url} className="w-full p-3 border rounded-xl bg-gray-50 focus:bg-white transition-colors" />
+               <label className="text-sm font-bold text-gray-700">აიქონი (Icon)</label>
+               <div className="flex items-center gap-3">
+                 {iconPreview && (
+                   <div className="w-14 h-14 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                     <img src={iconPreview} alt="icon" className="w-10 h-10 object-contain" />
+                   </div>
+                 )}
+                 <div className="flex-1 space-y-1">
+                   <input
+                     name="icon_url"
+                     defaultValue={currentCategory?.icon_url || ''}
+                     onChange={e => { setIconPreview(e.target.value); setIconFile(null); }}
+                     className="w-full p-2.5 border rounded-xl bg-gray-50 focus:bg-white transition-colors text-sm"
+                     placeholder="URL ან ატვირთეთ ფაილი"
+                   />
+                   <input
+                     ref={iconInputRef}
+                     type="file"
+                     accept="image/*"
+                     className="hidden"
+                     onChange={e => {
+                       const f = e.target.files[0];
+                       if (f) {
+                         if (f.size > 5 * 1024 * 1024) { toast({ title: "ფაილი ძალიან დიდია (მაქს 5MB)", variant: "destructive" }); return; }
+                         setIconFile(f);
+                         setIconPreview(URL.createObjectURL(f));
+                       }
+                     }}
+                   />
+                   <button type="button" onClick={() => iconInputRef.current?.click()} className="text-xs text-[#57c5cf] font-bold hover:underline flex items-center gap-1">
+                     <Upload className="w-3 h-3" /> ატვირთვა
+                   </button>
+                 </div>
+               </div>
             </div>
             <div className="space-y-2">
                <label className="text-sm font-bold text-gray-700">Color Hex</label>
@@ -188,6 +260,49 @@ const AdminCategories = () => {
                  <input type="color" name="color" defaultValue={currentCategory?.color || '#57c5cf'} className="h-12 w-20 rounded-xl cursor-pointer" />
                  <input type="text" defaultValue={currentCategory?.color || '#57c5cf'} className="flex-1 p-3 border rounded-xl bg-gray-50 font-mono" />
                </div>
+            </div>
+          </div>
+
+          {/* Category Image */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">კატეგორიის სურათი</label>
+            <div className="flex items-start gap-4">
+              {imagePreview ? (
+                <div className="w-32 h-24 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex-shrink-0 relative group">
+                  <img src={imagePreview} alt="category" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-32 h-24 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                  <ImageIcon className="w-8 h-8 text-gray-300" />
+                </div>
+              )}
+              <div className="flex-1 space-y-1">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files[0];
+                    if (f) {
+                      if (f.size > 5 * 1024 * 1024) { toast({ title: "ფაილი ძალიან დიდია (მაქს 5MB)", variant: "destructive" }); return; }
+                      setImageFile(f);
+                      setImagePreview(URL.createObjectURL(f));
+                    }
+                  }}
+                />
+                <button type="button" onClick={() => imageInputRef.current?.click()} className="px-4 py-2 border border-[#57c5cf] text-[#57c5cf] rounded-xl text-sm font-bold hover:bg-[#57c5cf]/5 flex items-center gap-2 transition-colors">
+                  <Upload className="w-4 h-4" /> სურათის ატვირთვა
+                </button>
+                <p className="text-xs text-gray-400">რეკომენდებული: 600x400px, მაქს 5MB</p>
+              </div>
             </div>
           </div>
 
@@ -217,8 +332,8 @@ const AdminCategories = () => {
                <span className="text-sm font-bold text-gray-700">Active</span>
              </label>
              <div className="flex-grow"></div>
-             <Button type="submit" className="bg-[#57c5cf] hover:bg-[#4bc0cb] px-8 rounded-xl gap-2 h-12">
-               <Save className="w-4 h-4" /> შენახვა
+             <Button type="submit" className="bg-[#57c5cf] hover:bg-[#4bc0cb] px-8 rounded-xl gap-2 h-12" disabled={saving}>
+               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} შენახვა
              </Button>
           </div>
         </form>
