@@ -44,6 +44,7 @@ const AdminProductEdit = () => {
   const [categoryAttributes, setCategoryAttributes] = useState([]);
   const [productAttributes, setProductAttributes] = useState([]); 
   const [isSavingAttributes, setIsSavingAttributes] = useState(false);
+  const [customOptionInputs, setCustomOptionInputs] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -199,6 +200,35 @@ const AdminProductEdit = () => {
         ? { ...p, price: price === '' ? null : Number(price) }
         : p
     ));
+  };
+
+  // Add a custom option (not predefined in category) for a priced attribute
+  const handleAddCustomOption = (attrName, attrType) => {
+    const input = customOptionInputs[attrName];
+    if (!input?.value?.trim()) return;
+    
+    // Check for duplicates
+    const exists = productAttributes.find(p => p.attribute_name === attrName && p.attribute_value === input.value.trim());
+    if (exists) {
+      toast({ title: "ეს მნიშვნელობა უკვე არსებობს", variant: "destructive" });
+      return;
+    }
+
+    setProductAttributes(prev => [...prev, {
+      attribute_name: attrName,
+      attribute_type: attrType,
+      attribute_value: input.value.trim(),
+      attribute_value_en: '',
+      attribute_value_ru: '',
+      price: input.price === '' || input.price == null ? null : Number(input.price)
+    }]);
+    
+    setCustomOptionInputs(prev => ({ ...prev, [attrName]: { value: '', price: '' } }));
+  };
+
+  // Remove a custom option
+  const handleRemoveCustomOption = (attrName, optValue) => {
+    setProductAttributes(prev => prev.filter(p => !(p.attribute_name === attrName && p.attribute_value === optValue)));
   };
 
   // For simple text/single-value attributes
@@ -496,6 +526,9 @@ const AdminProductEdit = () => {
                           if (hasOpts && hasPricedOpts) {
                             const selectedForAttr = productAttributes.filter(pa => pa.attribute_name === attr.attribute_name);
                             const selectedValues = selectedForAttr.map(pa => pa.attribute_value);
+                            const predefinedValues = opts.map(o => o.value);
+                            const customOptions = selectedForAttr.filter(pa => !predefinedValues.includes(pa.attribute_value));
+                            const inputState = customOptionInputs[attr.attribute_name] || { value: '', price: '' };
                             
                             return (
                               <div key={attr.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -548,6 +581,71 @@ const AdminProductEdit = () => {
                                       </div>
                                     );
                                   })}
+
+                                  {/* Custom options added for this product (not in category template) */}
+                                  {customOptions.map((co, i) => (
+                                    <div key={`custom-${i}`} className="flex items-center gap-3 p-3 rounded-xl border bg-white border-amber-200 shadow-sm">
+                                      <div className="flex items-center gap-3 flex-grow min-w-0">
+                                        <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold flex-shrink-0">NEW</span>
+                                        <span className="font-bold text-sm text-gray-900 truncate">{co.attribute_value}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <span className="text-xs text-gray-400">₾</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={co.price ?? ''}
+                                          onChange={(e) => handleOptionPriceChange(attr.attribute_name, co.attribute_value, e.target.value)}
+                                          className="w-24 p-2 border rounded-lg text-sm font-mono text-right bg-white border-[#f292bc]/30 focus:border-[#f292bc] outline-none text-gray-900"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveCustomOption(attr.attribute_name, co.attribute_value)}
+                                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Add custom option form */}
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <p className="text-xs text-gray-400 mb-2">ახალი ვარიანტის დამატება:</p>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="მაგ: XL, 100x120..."
+                                      value={inputState.value}
+                                      onChange={(e) => setCustomOptionInputs(prev => ({
+                                        ...prev,
+                                        [attr.attribute_name]: { ...inputState, value: e.target.value }
+                                      }))}
+                                      className="flex-grow p-2.5 border rounded-xl text-sm bg-white focus:border-[#57c5cf] outline-none"
+                                    />
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <span className="text-xs text-gray-400">₾</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="ფასი"
+                                        value={inputState.price}
+                                        onChange={(e) => setCustomOptionInputs(prev => ({
+                                          ...prev,
+                                          [attr.attribute_name]: { ...inputState, price: e.target.value }
+                                        }))}
+                                        className="w-24 p-2.5 border rounded-xl text-sm font-mono text-right bg-white focus:border-[#f292bc] outline-none"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddCustomOption(attr.attribute_name, attr.attribute_type)}
+                                      className="p-2.5 bg-[#57c5cf] text-white rounded-xl hover:bg-[#4bc0cb] transition-colors flex-shrink-0"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                                 
                                 {selectedValues.length > 0 && (
