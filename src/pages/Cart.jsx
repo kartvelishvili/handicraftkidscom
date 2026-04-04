@@ -59,7 +59,7 @@ const Cart = () => {
           <AnimatePresence>
             {cartItems.map((item) => (
               <motion.div
-                key={item.id}
+                key={item.cartKey || item.id}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -80,19 +80,28 @@ const Cart = () => {
                 <div className="flex-grow text-center sm:text-left">
                   <h3 className="text-xl font-heading font-bold text-gray-800 mb-1">{item.name}</h3>
                   <p className="text-sm text-gray-500 font-body mb-2">{item.category}</p>
-                  <p className="text-[#57c5cf] font-bold text-lg">₾{item.price}.00</p>
+                  {item.selectedOptions && Object.keys(item.selectedOptions).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {Object.entries(item.selectedOptions).map(([key, val]) => (
+                        <span key={key} className="text-xs bg-[#57c5cf]/10 text-[#57c5cf] px-2 py-0.5 rounded-full font-bold">
+                          {key}: {val}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[#57c5cf] font-bold text-lg">₾{Number(item.price).toFixed(2)}</p>
                 </div>
 
                 <div className="flex items-center gap-3 bg-gray-50 rounded-full px-2 py-1">
                   <button 
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    onClick={() => updateQuantity(item.cartKey || item.id, item.quantity - 1)}
                     className="p-2 hover:text-[#f292bc] transition-colors"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
                   <span className="w-8 text-center font-bold text-gray-700">{item.quantity}</span>
                   <button 
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.cartKey || item.id, item.quantity + 1)}
                     className="p-2 hover:text-[#57c5cf] transition-colors"
                   >
                     <Plus className="w-4 h-4" />
@@ -104,7 +113,7 @@ const Cart = () => {
                     ₾{(item.price * item.quantity).toFixed(2)}
                   </p>
                   <button 
-                    onClick={() => removeFromCart(item.id)}
+                    onClick={() => removeFromCart(item.cartKey || item.id)}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                   >
                     <Trash2 className="w-5 h-5" />

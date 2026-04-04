@@ -106,6 +106,35 @@ const ProductDetail = () => {
     if (product) trackViewItem(product);
   }, [product?.id]);
 
+  // Auto-select the cheapest option per priced attribute group
+  useEffect(() => {
+    if (productAttributes.length === 0) return;
+    const attrGroups = {};
+    productAttributes.forEach(pa => {
+      if (!attrGroups[pa.attribute_name]) attrGroups[pa.attribute_name] = [];
+      attrGroups[pa.attribute_name].push(pa);
+    });
+    
+    let firstPricedGroup = null;
+    const autoSelections = {};
+    Object.entries(attrGroups).forEach(([name, items]) => {
+      const hasPrices = items.some(it => it.price != null && it.price > 0);
+      if (hasPrices && items.length >= 1) {
+        const sorted = [...items].sort((a, b) => (a.price || 0) - (b.price || 0));
+        autoSelections[name] = sorted[0].attribute_value;
+        if (!firstPricedGroup) firstPricedGroup = sorted[0];
+      }
+    });
+    
+    if (Object.keys(autoSelections).length > 0) {
+      setSelectedOptions(autoSelections);
+      if (firstPricedGroup?.price != null) {
+        setSelectedAttrPrice(firstPricedGroup.price);
+        setSelectedAttrName(Object.keys(autoSelections)[0]);
+      }
+    }
+  }, [productAttributes]);
+
   if (loading) return (
      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#57c5cf]"></div>
@@ -150,11 +179,22 @@ const ProductDetail = () => {
 
   const handleAddToCart = () => {
     if(!isOutOfStock) {
-      const productWithPrice = selectedAttrPrice != null 
-        ? { ...product, price: selectedAttrPrice, selectedOptions }
-        : product;
-      addToCart(productWithPrice, quantity);
-      trackAddToCart(productWithPrice, quantity);
+      // Build a variant key from selected options for unique cart identification
+      const optionsSuffix = Object.entries(selectedOptions)
+        .filter(([_, v]) => v)
+        .map(([k, v]) => `${k}:${v}`)
+        .join('|');
+      
+      const productForCart = {
+        ...product,
+        price: selectedAttrPrice ?? product.price,
+        selectedOptions: { ...selectedOptions },
+        // Unique cart key so different sizes are separate items
+        cartKey: optionsSuffix ? `${product.id}__${optionsSuffix}` : product.id,
+      };
+      
+      addToCart(productForCart, quantity);
+      trackAddToCart(productForCart, quantity);
       toast({ 
         title: "კალათაში დაემატა!",
         description: `${quantity} x ${displayName}`,
@@ -285,15 +325,32 @@ const ProductDetail = () => {
                   </p>
                </div>
                
-               {/* Selectable Attributes with Prices (from category_attributes) */}
+               {/* Selectable Attributes with Prices */}
                {(() => {
-                 const pricedAttrs = categoryAttributes.filter(ca => {
-                   if (!['dropdown', 'checkbox'].includes(ca.attribute_type)) return false;
-                   const opts = normalizeOptions(ca.options);
-                   return opts.some(o => o.price != null && o.price > 0);
+                 // Group product_attributes by attribute_name to find multi-option attributes
+                 const attrGroups = {};
+                 productAttributes.forEach(pa => {
+                   if (!attrGroups[pa.attribute_name]) attrGroups[pa.attribute_name] = [];
+                   attrGroups[pa.attribute_name].push(pa);
                  });
                  
-                 if (pricedAttrs.length === 0 && productAttributes.length === 0) return null;
+                 // Separate: priced multi-option groups vs simple single-value attributes
+                 const pricedGroups = [];
+                 const simpleAttrs = [];
+                 
+                 Object.entries(attrGroups).forEach(([name, items]) => {
+                   const hasPrices = items.some(it => it.price != null && it.price > 0);
+                   if (hasPrices && items.length >= 1) {
+                     pricedGroups.push({ name, items });
+                   } else {
+                     simpleAttrs.push(...items);
+                   }
+                 });
+                 
+                 if (pricedGroups.length === 0 && simpleAttrs.length === 0) return null;
+                 
+                 // Find matching category attribute for display name translation
+                 const getCatAttr = (attrName) => categoryAttributes.find(ca => ca.attribute_name === attrName);
                  
                  return (
                    <div className="mb-8 space-y-4">
@@ -301,43 +358,51 @@ const ProductDetail = () => {
                         <Package className="w-4 h-4 text-[#57c5cf]" /> მახასიათებლები
                      </h3>
                      
-                     {/* Selectable options with prices */}
-                     {pricedAttrs.map(attr => {
-                       const opts = normalizeOptions(attr.options);
-                       const selectedOpt = selectedOptions[attr.attribute_name];
+                     {/* Priced selectable options (sizes etc.) */}
+                     {pricedGroups.map(({ name, items }) => {
+                       const catAttr = getCatAttr(name);
+                       let displayLabel = name;
+                       if (language === 'en' && catAttr?.name_en) displayLabel = catAttr.name_en;
+                       if (language === 'ru' && catAttr?.name_ru) displayLabel = catAttr.name_ru;
                        
-                       let displayName = attr.attribute_name;
-                       if (language === 'en' && attr.name_en) displayName = attr.name_en;
-                       if (language === 'ru' && attr.name_ru) displayName = attr.name_ru;
+                       const selectedOpt = selectedOptions[name];
+                       // Sort by price ascending
+                       const sorted = [...items].sort((a, b) => (a.price || 0) - (b.price || 0));
                        
                        return (
-                         <div key={attr.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                           <label className="text-sm font-bold text-gray-700 mb-3 block">{displayName}</label>
+                         <div key={name} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                           <label className="text-sm font-bold text-gray-700 mb-3 block">
+                             {displayLabel}
+                             <span className="text-xs font-normal text-gray-400 ml-2">({sorted.length} ვარიანტი)</span>
+                           </label>
                            <div className="flex flex-wrap gap-2">
-                             {opts.map((opt, i) => {
-                               const isSelected = selectedOpt?.value === opt.value;
+                             {sorted.map((item, i) => {
+                               const isSelected = selectedOpt === item.attribute_value;
                                return (
                                  <button
                                    key={i}
                                    type="button"
                                    onClick={() => {
-                                     setSelectedOptions(prev => ({...prev, [attr.attribute_name]: opt}));
-                                     if (opt.price != null) {
-                                       setSelectedAttrPrice(opt.price);
-                                       setSelectedAttrName(attr.attribute_name);
+                                     setSelectedOptions(prev => ({...prev, [name]: item.attribute_value}));
+                                     if (item.price != null) {
+                                       setSelectedAttrPrice(item.price);
+                                       setSelectedAttrName(name);
                                      }
                                    }}
                                    className={cn(
-                                     "px-4 py-2.5 rounded-xl text-sm font-bold border-2 transition-all",
+                                     "px-4 py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center min-w-[80px]",
                                      isSelected
-                                       ? "bg-[#57c5cf] text-white border-[#57c5cf] shadow-lg shadow-[#57c5cf]/20"
-                                       : "bg-white text-gray-700 border-gray-200 hover:border-[#57c5cf]/50 hover:bg-[#57c5cf]/5"
+                                       ? "bg-[#57c5cf] text-white border-[#57c5cf] shadow-lg shadow-[#57c5cf]/25 scale-[1.02]"
+                                       : "bg-white text-gray-700 border-gray-200 hover:border-[#57c5cf]/50 hover:bg-[#57c5cf]/5 hover:shadow-sm"
                                    )}
                                  >
-                                   {opt.value}
-                                   {opt.price != null && (
-                                     <span className={cn("ml-2 text-xs", isSelected ? "text-white/80" : "text-[#f292bc]")}>
-                                       ₾{opt.price}
+                                   <span>{item.attribute_value}</span>
+                                   {item.price != null && (
+                                     <span className={cn(
+                                       "text-xs mt-0.5 font-bold",
+                                       isSelected ? "text-white/90" : "text-[#f292bc]"
+                                     )}>
+                                       ₾{item.price}
                                      </span>
                                    )}
                                  </button>
@@ -348,17 +413,12 @@ const ProductDetail = () => {
                        );
                      })}
 
-                     {/* Static attributes (without prices or non-selectable) */}
-                     {productAttributes.length > 0 && (
+                     {/* Simple attributes (non-priced, single value) */}
+                     {simpleAttrs.length > 0 && (
                        <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                           <AttributeDisplay 
-                            initialAttributes={productAttributes} 
+                            initialAttributes={simpleAttrs} 
                             language={language}
-                            onPriceSelect={(name, price) => {
-                              setSelectedAttrName(name);
-                              setSelectedAttrPrice(price);
-                            }}
-                            selectedAttrName={selectedAttrName}
                           />
                        </div>
                      )}

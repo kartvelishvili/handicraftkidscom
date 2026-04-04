@@ -171,46 +171,56 @@ const AdminProductEdit = () => {
     return data.publicUrl;
   };
 
+  // Toggle a multi-option attribute (e.g. size "0-6 თვე" on/off for this product)
+  const handleToggleOption = (attrName, optValue, optPrice, attrType) => {
+    setProductAttributes(prev => {
+      const exists = prev.find(p => p.attribute_name === attrName && p.attribute_value === optValue);
+      if (exists) {
+        // Remove it
+        return prev.filter(p => !(p.attribute_name === attrName && p.attribute_value === optValue));
+      } else {
+        // Add new row
+        return [...prev, {
+          attribute_name: attrName,
+          attribute_type: attrType,
+          attribute_value: optValue,
+          attribute_value_en: '',
+          attribute_value_ru: '',
+          price: optPrice
+        }];
+      }
+    });
+  };
+
+  // Update price for a specific attribute+value combo
+  const handleOptionPriceChange = (attrName, optValue, price) => {
+    setProductAttributes(prev => prev.map(p => 
+      (p.attribute_name === attrName && p.attribute_value === optValue)
+        ? { ...p, price: price === '' ? null : Number(price) }
+        : p
+    ));
+  };
+
+  // For simple text/single-value attributes
   const handleAttributeChange = (attrName, value, type, isMultiSelect, lang = 'ka') => {
     setProductAttributes(prev => {
-      // Find existing attribute
       const existingIndex = prev.findIndex(p => p.attribute_name === attrName);
-      
       if (existingIndex >= 0) {
-        // Update existing
         const newAttrs = [...prev];
         if (lang === 'ka') newAttrs[existingIndex].attribute_value = value;
         if (lang === 'en') newAttrs[existingIndex].attribute_value_en = value;
         if (lang === 'ru') newAttrs[existingIndex].attribute_value_ru = value;
         return newAttrs;
       } else {
-        // Create new
         const newAttr = { 
-          attribute_name: attrName, 
-          attribute_type: type,
-          attribute_value: '',
-          attribute_value_en: '',
-          attribute_value_ru: '',
-          price: null
+          attribute_name: attrName, attribute_type: type,
+          attribute_value: '', attribute_value_en: '', attribute_value_ru: '', price: null
         };
         if (lang === 'ka') newAttr.attribute_value = value;
         if (lang === 'en') newAttr.attribute_value_en = value;
         if (lang === 'ru') newAttr.attribute_value_ru = value;
-        
         return [...prev, newAttr];
       }
-    });
-  };
-
-  const handleAttributePriceChange = (attrName, price) => {
-    setProductAttributes(prev => {
-      const existingIndex = prev.findIndex(p => p.attribute_name === attrName);
-      if (existingIndex >= 0) {
-        const newAttrs = [...prev];
-        newAttrs[existingIndex].price = price === '' ? null : Number(price);
-        return newAttrs;
-      }
-      return prev;
     });
   };
 
@@ -472,9 +482,8 @@ const AdminProductEdit = () => {
                     <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
                           <Layers className="w-5 h-5 text-[#57c5cf]" /> 
-                          მახასიათებლები ({activeTab.toUpperCase()})
+                          მახასიათებლები
                        </h3>
-                       <span className="text-xs text-gray-400">ფასი = ზომის მიხედვით ფასი</span>
                     </div>
 
                     <div className="space-y-6">
@@ -483,6 +492,113 @@ const AdminProductEdit = () => {
                           const hasOpts = ['dropdown', 'checkbox'].includes(attr.attribute_type) && opts.length > 0;
                           const hasPricedOpts = opts.some(o => o.price != null && o.price > 0);
 
+                          // For multi-option attributes (sizes with prices): show checkboxes
+                          if (hasOpts && hasPricedOpts) {
+                            const selectedForAttr = productAttributes.filter(pa => pa.attribute_name === attr.attribute_name);
+                            const selectedValues = selectedForAttr.map(pa => pa.attribute_value);
+                            
+                            return (
+                              <div key={attr.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                <label className="text-sm font-bold text-gray-700 flex gap-2 items-center mb-3">
+                                  {attr.attribute_name}
+                                  <span className="text-[10px] bg-[#f292bc]/10 text-[#f292bc] px-2 py-0.5 rounded-full font-bold">ფასით</span>
+                                </label>
+                                <p className="text-xs text-gray-400 mb-3">მონიშნეთ ზომები რომლებიც ამ პროდუქტს აქვს. ფასი ავტომატურად შეივსება.</p>
+                                
+                                <div className="space-y-2">
+                                  {opts.map((opt, i) => {
+                                    const isChecked = selectedValues.includes(opt.value);
+                                    const existingRow = selectedForAttr.find(pa => pa.attribute_value === opt.value);
+                                    
+                                    return (
+                                      <div key={i} className={cn(
+                                        "flex items-center gap-3 p-3 rounded-xl border transition-all",
+                                        isChecked ? "bg-white border-[#57c5cf]/30 shadow-sm" : "bg-gray-50 border-gray-200"
+                                      )}>
+                                        <label className="flex items-center gap-3 cursor-pointer flex-grow min-w-0">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => handleToggleOption(attr.attribute_name, opt.value, opt.price, attr.attribute_type)}
+                                            className="w-5 h-5 text-[#57c5cf] rounded border-gray-300 focus:ring-[#57c5cf] flex-shrink-0"
+                                          />
+                                          <span className={cn(
+                                            "font-bold text-sm truncate",
+                                            isChecked ? "text-gray-900" : "text-gray-500"
+                                          )}>
+                                            {opt.value}
+                                          </span>
+                                        </label>
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                          <span className="text-xs text-gray-400">₾</span>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            disabled={!isChecked}
+                                            value={isChecked ? (existingRow?.price ?? '') : (opt.price ?? '')}
+                                            onChange={(e) => handleOptionPriceChange(attr.attribute_name, opt.value, e.target.value)}
+                                            className={cn(
+                                              "w-24 p-2 border rounded-lg text-sm font-mono text-right",
+                                              isChecked 
+                                                ? "bg-white border-[#f292bc]/30 focus:border-[#f292bc] outline-none text-gray-900" 
+                                                : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                            )}
+                                          />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                
+                                {selectedValues.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-1.5">
+                                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">არჩეული:</span>
+                                    {selectedForAttr.map((pa, i) => (
+                                      <span key={i} className="text-[11px] bg-[#57c5cf]/10 text-[#57c5cf] px-2 py-0.5 rounded-full font-bold">
+                                        {pa.attribute_value} — ₾{pa.price ?? '?'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // For simple dropdown (without prices): single select
+                          if (hasOpts) {
+                            const currentAttr = productAttributes.find(pa => pa.attribute_name === attr.attribute_name);
+                            const currentValue = activeTab === 'ka' ? (currentAttr?.attribute_value || '') 
+                              : activeTab === 'en' ? (currentAttr?.attribute_value_en || '') 
+                              : (currentAttr?.attribute_value_ru || '');
+
+                            return (
+                              <div key={attr.id} className="space-y-2 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                <label className="text-sm font-bold text-gray-700 mb-1">{attr.attribute_name}</label>
+                                {activeTab === 'ka' ? (
+                                  <select
+                                    value={currentValue}
+                                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, 'ka')}
+                                    className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none cursor-pointer"
+                                  >
+                                    <option value="">-- აირჩიეთ --</option>
+                                    {opts.map((opt, i) => (
+                                      <option key={i} value={opt.value}>{opt.value}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={currentValue}
+                                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
+                                    className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
+                                    placeholder={activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
+                                  />
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // For text/info attributes: simple text input
                           const currentAttr = productAttributes.find(pa => pa.attribute_name === attr.attribute_name);
                           let currentValue = '';
                           if (activeTab === 'ka') currentValue = currentAttr?.attribute_value || '';
@@ -491,58 +607,16 @@ const AdminProductEdit = () => {
 
                           return (
                             <div key={attr.id} className="space-y-2 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                               <label className="text-sm font-bold text-gray-700 flex gap-1 items-center mb-1">
+                               <label className="text-sm font-bold text-gray-700 mb-1">
                                   {attr.attribute_name}
-                                  {hasPricedOpts && <span className="text-[10px] text-[#f292bc] font-normal ml-1">(ფასით)</span>}
                                </label>
-                               
-                               <div className="flex gap-3">
-                                 {hasOpts && activeTab === 'ka' ? (
-                                   <select
-                                     value={currentValue}
-                                     onChange={(e) => {
-                                       const val = e.target.value;
-                                       handleAttributeChange(attr.attribute_name, val, attr.attribute_type, false, 'ka');
-                                       // Auto-fill price from category attribute options
-                                       if (hasPricedOpts) {
-                                         const selectedOpt = opts.find(o => o.value === val);
-                                         if (selectedOpt && selectedOpt.price != null) {
-                                           handleAttributePriceChange(attr.attribute_name, selectedOpt.price);
-                                         }
-                                       }
-                                     }}
-                                     className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none cursor-pointer"
-                                   >
-                                     <option value="">-- აირჩიეთ --</option>
-                                     {opts.map((opt, i) => (
-                                       <option key={i} value={opt.value}>
-                                         {opt.value}{opt.price != null ? ` (₾${opt.price})` : ''}
-                                       </option>
-                                     ))}
-                                   </select>
-                                 ) : (
-                                   <input 
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
-                                      className="flex-grow p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
-                                      placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
-                                   />
-                                 )}
-                                 <div className="w-32 flex-shrink-0">
-                                   <input 
-                                      type="number"
-                                      step="0.01"
-                                      value={currentAttr?.price ?? ''}
-                                      onChange={(e) => handleAttributePriceChange(attr.attribute_name, e.target.value)}
-                                      className={cn(
-                                        "w-full p-3 border rounded-xl bg-white text-sm focus:border-[#f292bc] outline-none font-mono",
-                                        hasPricedOpts && "bg-pink-50/50"
-                                      )}
-                                      placeholder="₾ ფასი"
-                                   />
-                                 </div>
-                               </div>
+                               <input 
+                                  type="text"
+                                  value={currentValue}
+                                  onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value, attr.attribute_type, false, activeTab)}
+                                  className="w-full p-3 border rounded-xl bg-white text-sm focus:border-[#57c5cf] outline-none"
+                                  placeholder={activeTab === 'ka' ? `მნიშვნელობა (KA)` : activeTab === 'en' ? `Value (EN)` : `Значение (RU)`}
+                               />
                             </div>
                           );
                        })}

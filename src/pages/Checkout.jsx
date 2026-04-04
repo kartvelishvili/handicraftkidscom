@@ -310,12 +310,17 @@ const Checkout = () => {
             
             <div className="space-y-4 mb-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
               {cartItems.map(item => (
-                <div key={item.id} className="flex gap-3 items-center">
+                <div key={item.cartKey || item.id} className="flex gap-3 items-center">
                   <div className="w-16 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
                     <img src={item.image_url || item.image} alt={item.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-grow">
                     <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{item.name}</h4>
+                    {item.selectedOptions && Object.keys(item.selectedOptions).length > 0 && (
+                      <p className="text-[10px] text-[#57c5cf] font-bold">
+                        {Object.entries(item.selectedOptions).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-500">x{item.quantity}</p>
                   </div>
                   <p className="font-bold text-[#57c5cf]">₾{(item.price * item.quantity).toFixed(2)}</p>

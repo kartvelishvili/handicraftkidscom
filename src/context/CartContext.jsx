@@ -30,11 +30,14 @@ export const CartProvider = ({ children }) => {
         itemToStore.id = itemToStore.uuid;
     }
 
+    // Use cartKey for variant-aware identity (e.g. same product different size)
+    const cartIdentity = itemToStore.cartKey || itemToStore.id;
+
     setCartItems(prevItems => {
-      const existingItem = prevItems.find(item => item.id === itemToStore.id);
+      const existingItem = prevItems.find(item => (item.cartKey || item.id) === cartIdentity);
       if (existingItem) {
         return prevItems.map(item =>
-          item.id === itemToStore.id
+          (item.cartKey || item.id) === cartIdentity
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
@@ -50,7 +53,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = (productId) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
+    setCartItems(prevItems => prevItems.filter(item => (item.cartKey || item.id) !== productId));
     toast({
       title: "წაიშალა კალათიდან 🗑️",
       className: "bg-[#f292bc] text-white border-none"
@@ -61,7 +64,7 @@ export const CartProvider = ({ children }) => {
     if (newQuantity < 1) return;
     setCartItems(prevItems =>
       prevItems.map(item =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
+        (item.cartKey || item.id) === productId ? { ...item, quantity: newQuantity } : item
       )
     );
   };
